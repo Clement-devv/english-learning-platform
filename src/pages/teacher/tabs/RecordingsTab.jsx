@@ -15,7 +15,7 @@ import Pagination from "../../../components/Pagination";
 import { visibleEmail } from "../../../utils/managedStudent.js";
 
 
-export default function RecordingsTab({ isDarkMode, studio = false }) {
+export default function RecordingsTab({ isDarkMode, studio = false, onVisibilityChange }) {
   const [recordings,      setRecordings]      = useState([]);
   const [loading,         setLoading]         = useState(true);
   const [playing,         setPlaying]         = useState(null); // { key, index } — session key + part index
@@ -160,6 +160,7 @@ export default function RecordingsTab({ isDarkMode, studio = false }) {
       }
       const ids = new Set(session.parts.map(p => p._id));
       setRecordings(prev => prev.map(r => ids.has(r._id) ? { ...r, visibleToStudent } : r));
+      onVisibilityChange?.();
       showToast(visibleToStudent ? "Visible to student ✓" : "Hidden from student");
     } catch { showToast("Failed to update visibility"); }
   };

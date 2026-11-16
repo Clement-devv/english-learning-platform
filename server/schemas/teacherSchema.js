@@ -11,6 +11,7 @@ export const teacherSchema = new mongoose.Schema({
   accountType: { type: String, enum: ['center', 'standalone'], default: 'center' },
   ratePerClass: Number,
   password: String,
+  gender: { type: String, enum: ["Female","Male","Non-binary","Prefer not to say"] },
   continent: {
     type: String,
     enum: ['Africa', 'Europe', 'Asia', 'Americas', 'Oceania'],

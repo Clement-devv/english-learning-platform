@@ -14,6 +14,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import api, { refreshToken } from '../api';
 import { ROLE_CONFIG, readStorage, clearAuth } from '../utils/authStorage.js';
 import { decodeJwtPayload } from '../utils/jwt.js';
+import { teacherModeKey } from '../utils/teacherMode';
 import { saveStudentReturn } from '../utils/studentReturn.js';
 
 // Classroom accepts any of these roles
@@ -88,7 +89,12 @@ export default function AuthGuard({ role, children }) {
         return;
       }
 
-      loginPathRef.current = cfg.loginPath;
+      const standalone = role === 'teacher' && location.pathname.startsWith('/teacher-mode/');
+      loginPathRef.current = standalone ? '/teacher-mode/login' : cfg.loginPath;
+      if (standalone && !teacherModeKey()) {
+        if (!cancelled) setStatus('denied');
+        return;
+      }
       const token = getToken(cfg);
 
       if (!token) {
@@ -118,7 +124,7 @@ export default function AuthGuard({ role, children }) {
 
     verify();
     return () => { cancelled = true; };
-  }, [role]);
+  }, [role, location.pathname]);
 
   if (status === 'loading') {
     const dark = role === 'super-admin';

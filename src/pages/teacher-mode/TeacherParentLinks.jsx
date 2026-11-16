@@ -22,7 +22,6 @@ export default function TeacherParentLinks({ centers, students, busy, run, copy,
       .finally(() => { if (current) setLoading(false); });
     return () => { current = false; controller.abort(); };
   }, [page, kind, centerId, studentId, revision]);
-  useEffect(() => { const timer = setInterval(() => { if (!document.hidden) reload(); }, 30000); return () => clearInterval(timer); }, [reload]);
   const mutate = action => run(async () => { await action(); reload(); });
   return <>
     <StudioIntro eyebrow="EVERY SHARED MOMENT, IN ONE PLACE" title="Your parent-link library." aside={<button onClick={reload}><RefreshCw size={14} />Refresh links</button>}>Links generated in homework, quizzes, games, and recordings are saved here automatically, with their student and managed center.</StudioIntro>

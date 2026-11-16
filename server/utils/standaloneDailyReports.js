@@ -1,3 +1,4 @@
+import { withStandaloneFooter } from '../emails/standaloneFooter.js';
 import { usedClassCounts } from './standaloneClassCounts.js';
 import { studentSchema } from '../schemas/studentSchema.js';
 import { details, esc, p, renderEmail } from '../emails/layout.js';
@@ -51,18 +52,26 @@ export async function deliverStandaloneDailyReport(
     const ended = { $lte: [{ $add: ['$scheduledTime', { $multiply: [{ $ifNull: ['$duration', 60] }, 60000] }] }, now] };
     const Booking = db.models.Booking || db.model('Booking', bookingSchema);
     const Group = db.models.GroupClass || db.model('GroupClass', groupClassSchema);
+    const Student = db.models.Student || db.model('Student', studentSchema);
+    const roster = { model: Student, match: { managedCenterId: center._id }, select: 'firstName lastName' };
     const [bookings, groups] = await Promise.all([
       Booking.find({ ...scope, $or: [{ status: { $in: ['completed','missed'] } }, { status: 'accepted', $expr: ended }] })
-        .select('classTitle scheduledTime duration status missedReason adminRejected adminRejectedReason').lean(),
+        .select('classTitle scheduledTime duration status missedReason adminRejected adminRejectedReason studentId').populate({ ...roster, path: 'studentId' }).lean(),
       Group.find({ ...scope, $or: [{ status: { $in: ['completed','missed'] } }, { status: { $in: ['open','full'] }, $expr: ended }] })
-        .select('title scheduledTime duration status missedReason').lean(),
+        .select('title scheduledTime duration status missedReason enrollments.studentId').populate({ ...roster, path: 'enrollments.studentId' }).lean(),
     ]);
     const rows = [...bookings.map(r => ({ ...r, title: r.classTitle, kind: 'Individual' })), ...groups.map(r => ({ ...r, kind: 'Group' }))]
       .sort((a,b) => a.scheduledTime - b.scheduledTime || String(a._id).localeCompare(String(b._id)));
     const completed = rows.filter(r => r.status === 'completed' && !r.adminRejected);
     const incomplete = rows.filter(r => r.status !== 'completed' || r.adminRejected);
     const clock = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit' });
-    const line = r => [clock.format(r.scheduledTime), r.title, r.kind, (r.duration || 60) + ' min'].join(' | ');
+    const studentLine = lesson => {
+      const group = lesson.kind === 'Group';
+      const students = group ? (lesson.enrollments || []).map(e => e.studentId) : [lesson.studentId];
+      const names = students.map(s => [s?.firstName, s?.lastName].filter(Boolean).join(' ') || 'Name unavailable');
+      return (group ? 'Enrolled students: ' : 'Student: ') + (names.join(', ') || 'None listed');
+    };
+    const line = r => [clock.format(r.scheduledTime), r.title, r.kind, (r.duration || 60) + ' min', studentLine(r)].join(' | ');
     const text = [
       'Teacher: ' + name, '', center.name + ' | ' + date + ' (' + timezone + ')',
       'Completed classes: ' + completed.length, 'Not completed: ' + incomplete.length, '',
@@ -76,6 +85,7 @@ export async function deliverStandaloneDailyReport(
         const reason = showReason ? lesson.adminRejectedReason || lesson.missedReason || 'Not marked as taught.' : '';
         const description = [
           esc(lesson.title),
+          esc(studentLine(lesson)),
           `<small>${lesson.kind} · ${esc(lesson.duration || 60)} min</small>`,
           reason && `Reason: ${esc(reason)}`,
         ].filter(Boolean).join('<br>');
@@ -117,7 +127,7 @@ async function deliverOnce(db, center, date, now, send) {
   }
   if (!claim) return null;
   try {
-    const response = await send();
+    const response = await withStandaloneFooter(send);
     if (!response?.success || response.skipped)
       throw new Error(response?.error || 'Daily report was not delivered');
     await Delivery.updateOne(
@@ -154,9 +164,10 @@ export async function deliverWeeklyStudentCounts(db, workspace, teacher, center,
     });
     const teacherName = [teacher.firstName, teacher.lastName].filter(Boolean).join(' ');
     return deliver({ to: center.notificationEmail, centerName: center.name,
-      subject: center.name + ' - weekly student class counts - ' + today,
+      subject: 'Weekly student class counts · ' + today,
       text: [teacherName, today, 'Paid classes used / total', ...rows.map(r => r.join(': '))].join('\n'),
       html: renderEmail({ centerName: center.name, eyebrow: 'Weekly student progress', title: 'Paid class counts',
+        preheader: teacherName + ' · Paid classes used and total purchased for ' + rows.length + (rows.length === 1 ? ' student.' : ' students.'),
         body: p(esc(teacherName) + ' · ' + today) + p('Paid classes used / total') +
           (rows.length ? details(rows) : p('No registered students.')) }),
     });

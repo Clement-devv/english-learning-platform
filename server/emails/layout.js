@@ -1,3 +1,4 @@
+import { footerSender } from './standaloneFooter.js';
 // server/emails/layout.js
 // The one Sunshine email layout every email is built from: center logo + name, a warm
 // card, one orange button, a plain footer.
@@ -128,7 +129,8 @@ export const renderEmail = ({ center, centerName, baseUrl, preheader = "", eyebr
   const logo = logoUrl(center, baseUrl);
   const initial = esc(rawName.trim()[0]?.toUpperCase() || "S");
   const auto = lang === "vi" ? "Đây là email tự động, vui lòng không trả lời." : "This is an automated message — please don't reply.";
-  const sentBy = lang === "vi" ? `Gửi từ ${name}` : `Sent by ${name}`;
+  const sender = footerSender(name);
+  const sentBy = lang === "vi" ? `Gửi từ ${sender}` : `Sent by ${sender}`;
 
   return `<!DOCTYPE html>
 <html lang="${lang}" xmlns="http://www.w3.org/1999/xhtml">
@@ -150,7 +152,7 @@ export const renderEmail = ({ center, centerName, baseUrl, preheader = "", eyebr
 </style>
 </head>
 <body data-em-layout="sunshine" style="margin:0;padding:0;background:${C.page};-webkit-text-size-adjust:100%;">
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">${esc(preheader)}&#8203;&nbsp;&#8203;&nbsp;&#8203;&nbsp;&#8203;&nbsp;&#8203;&nbsp;&#8203;&nbsp;</div>
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;">${esc(preheader || title)}${'&#8203;&nbsp;'.repeat(90)}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.page}" style="background:${C.page};">
     <tr><td align="center" class="em-shell" style="padding:28px 16px;">
       <table role="presentation" align="center" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;">

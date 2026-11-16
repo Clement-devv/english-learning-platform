@@ -190,7 +190,7 @@ export default function TeacherClassHistory({
           <button onClick={load}>Retry</button>
         </p>
       )}
-      {loading ? (
+      {loading && !data.classes?.length ? (
         <p role="status">Loading class history…</p>
       ) : (
         <div className="tm-lesson-records">

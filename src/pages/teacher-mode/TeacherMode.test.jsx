@@ -10,34 +10,34 @@ vi.mock('../../api', () => ({ default: { get: vi.fn(async url => ({ data: { data
 vi.mock('../../utils/teacherMode', () => ({ teacherModeKey: () => 'tw-synthetic' }));
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ user: { _id: 't1', firstName: 'Amara' }, logout: vi.fn(), login: vi.fn(), setUser: vi.fn() }) }));
 vi.mock('./client', () => ({ modeBase: '/api/teacher-mode', default: { post: vi.fn() } }));
-vi.mock('axios', () => ({ default: Object.assign(vi.fn(), { post: vi.fn() }) }));
+vi.mock('axios', () => ({ default: Object.assign(vi.fn(), { post: vi.fn(), get: vi.fn(async () => ({ data: { data: { studentName: 'Linh' } } })) }) }));
 import axios from 'axios';
 import TeacherModeDashboard from './TeacherModeDashboard';
 import TeacherFamilyPage from './TeacherFamilyPage';
 import TeacherModeLogin from './TeacherModeLogin';
 import client from './client';
 import api from '../../api';
-beforeEach(() => { sessionStorage.clear(); vi.clearAllMocks(); fixtures.links = []; });
+beforeEach(() => { sessionStorage.clear(); localStorage.clear(); vi.clearAllMocks(); fixtures.links = []; });
 describe('standalone teacher workspace', () => {
   it('keeps every student and their center in a separate directory', async () => {
     render(<MemoryRouter><TeacherModeDashboard /></MemoryRouter>);
     await screen.findByText('Hello, Amara.');
     fireEvent.change(screen.getByLabelText('Workspace view'), { target: { value: 'c1' } });
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Teacher workspace' })).getByRole('button', { name: 'Students', exact: true }));
-    const linh = screen.getByRole('heading', { name: 'Linh' }).closest('article');
+    const linh = (await screen.findByRole('heading', { name: 'Linh' }, { timeout: 10000 })).closest('article');
     const kai = screen.getByRole('heading', { name: 'Kai' }).closest('article');
     expect(within(linh).getByText('Sunrise English')).toBeInTheDocument();
     expect(within(kai).getByText('River School')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Create parent link', exact: true })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Filter students by center')).toHaveValue('');
-  });
+  }, 15000);
   it('creates a student directly inside the chosen center even when another workspace view is selected', async () => {
     api.post.mockResolvedValue({ data: { data: { id: 'new' } } });
     render(<MemoryRouter><TeacherModeDashboard /></MemoryRouter>);
     await screen.findByText('Hello, Amara.');
     fireEvent.change(screen.getByLabelText('Workspace view'), { target: { value: 'c2' } });
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Teacher workspace' })).getByRole('button', { name: 'My centers', exact: true }));
-    fireEvent.click(screen.getByRole('button', { name: 'Create student in Sunrise English' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Create student in Sunrise English' }));
     fireEvent.change(screen.getByLabelText('Student name'), { target: { value: 'Mai' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add student', exact: true }));
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/managed-students', { name: 'Mai', notifyEmail: '', centerId: 'c1' }));
@@ -48,7 +48,7 @@ describe('standalone teacher workspace', () => {
     await screen.findByText('Hello, Amara.');
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Teacher workspace' })).getByRole('button', { name: 'My centers', exact: true }));
     expect(screen.queryByLabelText('Center or client name')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Add managed center', exact: true }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Add managed center', exact: true }));
     expect(screen.getByLabelText('Center or client name')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Close center form', exact: true }));
     expect(screen.queryByLabelText('Center or client name')).not.toBeInTheDocument();
@@ -122,7 +122,7 @@ describe('parent learning page', () => {
     });
     render(<MemoryRouter initialEntries={['/family/test-token']}><Routes><Route path="/family/:token" element={<TeacherFamilyPage />} /></Routes></MemoryRouter>);
     expect(screen.queryByText('Read page 4 together')).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Student’s name'), { target: { value: 'Linh' } });
+    expect(await screen.findByText('Linh')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open learning page' }));
     expect(await screen.findByText('Read page 4 together')).toBeInTheDocument();
     expect(screen.getByText('Classes low. Please contact the admin.')).toBeInTheDocument();

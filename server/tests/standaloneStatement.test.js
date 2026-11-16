@@ -202,6 +202,11 @@ describe('standalone statements', () => {
     await db
       .collection('managedcenters')
       .insertOne({ _id: center, name: 'Test center', currency: 'USD' });
+    const linh = new mongoose.Types.ObjectId(), minh = new mongoose.Types.ObjectId();
+    await db.collection('students').insertMany([
+      { _id: linh, managedCenterId: center, firstName: 'Linh', lastName: 'Đặng' },
+      { _id: minh, managedCenterId: center, firstName: 'Minh' },
+    ]);
     const common = {
       teacherId: owner,
       managedCenterId: center,
@@ -212,11 +217,11 @@ describe('standalone statements', () => {
       standalonePay: { currency: 'USD', amountMinor: 2000 },
     };
     await db.collection('bookings').insertMany([
-      { ...common, classTitle: 'Reading' },
-      { ...common, status: 'missed', classTitle: 'Speaking practice', missedReason: 'No one joined.' },
+      { ...common, studentId: linh, classTitle: 'Reading' },
+      { ...common, studentId: minh, status: 'missed', classTitle: 'Speaking practice', missedReason: 'No one joined.' },
       { ...common, teacherId: new mongoose.Types.ObjectId(), classTitle: 'Other teacher' },
     ]);
-    await db.collection('groupclasses').insertOne({ ...common, title: 'Group vocabulary' });
+    await db.collection('groupclasses').insertOne({ ...common, title: 'Group vocabulary', enrollments: [{ studentId: linh }, { studentId: minh }] });
     const options = {
       teacherId: owner,
       timezone: 'Asia/Ho_Chi_Minh',
@@ -254,12 +259,12 @@ describe('standalone statements', () => {
     expect(send).toHaveBeenCalledTimes(2);
 
     const html = send.mock.calls[1][0].html;
-    for (const value of ['data-em-layout', 'Test center', 'Completed (2)', 'Not completed (1)', 'Speaking practice', 'No one joined.']) {
+    for (const value of ['data-em-layout', 'Test center', 'Completed (2)', 'Not completed (1)', 'Student: Linh Đặng', 'Enrolled students: Linh Đặng, Minh', 'Student: Minh', 'Speaking practice', 'No one joined.']) {
       expect(html).toContain(value);
     }
     expect(send.mock.calls[1][0].attachments).toBeUndefined();
     expect(send.mock.calls[1][0].text).toContain('Not completed: 1');
-    expect(send.mock.calls[1][0].text).toContain('Speaking practice | Individual | 45 min | No one joined.');
+    expect(send.mock.calls[1][0].text).toContain('Speaking practice | Individual | 45 min | Student: Minh | No one joined.');
     expect(send.mock.calls[1][0].text).not.toMatch(/salary|earnings|charges|USD|Other teacher/i);
     const second = { _id: new mongoose.Types.ObjectId(), name: 'Second center' };
     await db.collection('managedcenters').insertOne({ ...second, currency: 'USD' });

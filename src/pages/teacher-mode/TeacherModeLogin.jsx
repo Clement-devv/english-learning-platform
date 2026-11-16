@@ -1,3 +1,4 @@
+import { continents, genders } from '../../utils/teacherDemographics';
 import StudioLanguageSwitch from './StudioLanguageSwitch';
 import { useStudioLanguage } from './useStudioLanguage';
 import { studioText } from './studioLanguage';
@@ -16,6 +17,7 @@ export default function TeacherModeLogin({ mode = 'login' }) {
   const [email, setEmail] = useState(''), [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false), [showConfirm, setShowConfirm] = useState(false);
+  const [continent, setContinent] = useState(''), [gender, setGender] = useState('');
   const creatingPassword = mode === 'setup' || mode === 'reset';
   const [code, setCode] = useState(''), [twoFactor, setTwoFactor] = useState(false);
   const [useBackup, setUseBackup] = useState(false);
@@ -27,7 +29,7 @@ export default function TeacherModeLogin({ mode = 'login' }) {
     setBusy(true);
     try {
       const path = mode === 'setup' ? `/setup/${token}` : mode === 'reset' ? `/reset/${token}` : mode === 'forgot' ? '/forgot-password' : '/login';
-      const { data } = await client.post(path, { email, password, acceptTerms: accepted, ...(twoFactor && code ? (useBackup ? { backupCode: code.trim() } : { twoFactorToken: code.trim() }) : {}) }, { headers: { Authorization: '' } });
+      const { data } = await client.post(path, { email, password, ...(mode === 'setup' && { continent, gender }), acceptTerms: accepted, ...(twoFactor && code ? (useBackup ? { backupCode: code.trim() } : { twoFactorToken: code.trim() }) : {}) }, { headers: { Authorization: '' } });
       if (data.requires2FA) { setTwoFactor(true); return; }
       if (mode !== 'login') { setMessage(mode === 'forgot' ? data.data.message : 'Saved. You can now sign in.'); setPassword(''); setConfirmPassword(''); setShowPassword(false); setShowConfirm(false); return; }
       const teacher = { ...(data.teacher || data.user), accountType: 'standalone' };
@@ -44,7 +46,7 @@ export default function TeacherModeLogin({ mode = 'login' }) {
       {mode !== 'forgot' && <div><label htmlFor="studio-password">{studioText("Password")}</label><div className="tm-password-field"><input id="studio-password" type={showPassword ? 'text' : 'password'} required minLength={mode === 'login' ? 1 : 8} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e => setPassword(e.target.value)} /><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} aria-controls="studio-password" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>{creatingPassword && <small>Use at least 8 characters, including upper/lowercase letters, a number and a special character.</small>}</div>}
       {creatingPassword && <div><label htmlFor="studio-confirm-password">Confirm password</label><div className="tm-password-field"><input id="studio-confirm-password" type={showConfirm ? 'text' : 'password'} required minLength={8} autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} /><button type="button" aria-label={showConfirm ? 'Hide confirm password' : 'Show confirm password'} aria-pressed={showConfirm} aria-controls="studio-confirm-password" onClick={() => setShowConfirm(!showConfirm)}>{showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></div>}
       {twoFactor && <><label>{useBackup ? 'Backup code' : 'Authenticator code'}<input inputMode={useBackup ? 'text' : 'numeric'} autoComplete="one-time-code" required value={code} onChange={e => setCode(e.target.value)} /></label><button type="button" onClick={() => { setUseBackup(!useBackup); setCode(''); setMessage(''); }}>{useBackup ? 'Use authenticator code' : 'Use a backup code'}</button></>}
-      {mode === 'setup' && <><details><summary>Read the platform terms</summary><AccountTerms /></details><label className="tm-check"><input type="checkbox" required checked={accepted} onChange={e => setAccepted(e.target.checked)} /> I accept the platform terms.</label></>}
+      {mode === 'setup' && <><label>Continent<select required value={continent} onChange={e => setContinent(e.target.value)}><option value="">Select continent</option>{continents.map(v => <option key={v}>{v}</option>)}</select></label><label>Gender<select required value={gender} onChange={e => setGender(e.target.value)}><option value="">Select gender</option>{genders.map(v => <option key={v}>{v}</option>)}</select></label><details><summary>Read the platform terms</summary><AccountTerms /></details><label className="tm-check"><input type="checkbox" required checked={accepted} onChange={e => setAccepted(e.target.checked)} /> I accept the platform terms.</label></>}
       {message && <p role="status" className="tm-notice">{message}</p>}
       <button className="tm-primary" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? studioText('Open my workspace') : mode === 'forgot' ? 'Send reset link' : 'Save password'}</button>
     </form><Link to={mode === 'login' ? '/teacher-mode/forgot-password' : '/teacher-mode/login'}>{mode === 'login' ? studioText('Forgot password?') : 'Back to sign in'}</Link><p className="tm-muted">Teaching through a registered center? Use the sign-in link provided by your center.</p></section></main>;

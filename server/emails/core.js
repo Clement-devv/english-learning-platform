@@ -120,6 +120,7 @@ export const sendEmail = async (mailOptions) => {
         title: String(mailOptions.subject || "").replace(/^[^\p{L}\p{N}]+/u, ""),   // drop leading emoji
         centerName: mailOptions.centerName || config.appName,
         html: mailOptions.html,
+        preheader: mailOptions.preheader,
       }),
     };
   }

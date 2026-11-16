@@ -1,3 +1,4 @@
+import { continents, genders } from '../../../utils/teacherDemographics';
 import React, { useState, useEffect, useRef } from "react";
 import {
   User, Mail, Phone, Globe, DollarSign, Video,
@@ -107,6 +108,8 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate, studio =
     if (teacherInfo) {
       setPhotoPreview(teacherInfo.photo || "");
       setForm({
+        continent: teacherInfo.continent || '',
+        gender: teacherInfo.gender || '',
         displayName:       teacherInfo.displayName     || "",
         phone:             teacherInfo.phone           || "",
         timezone:          teacherInfo.timezone        || "",
@@ -178,6 +181,8 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate, studio =
         displayName:       form.displayName.trim(),
         phone:             form.phone.trim(),
         timezone:          form.timezone,
+        ...(studio && form.continent && { continent: form.continent }),
+        ...(studio && form.gender && { gender: form.gender }),
         googleMeetLink:    form.googleMeetLink.trim(),
         zoomLink:          form.zoomLink.trim(),
         bio:               form.bio.trim(),
@@ -380,12 +385,13 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate, studio =
               <input value={teacherInfo.email} disabled style={lockedStyle} />
             </div>
 
+            {studio && [['continent', 'Continent', continents], ['gender', 'Gender', genders]].map(([key, label, choices]) => <label key={key}>{label}<select value={form[key] || ''} onChange={set(key)} style={selectStyle}><option value="">Select {key}</option>{choices.map(choice => <option key={choice}>{choice}</option>)}</select></label>)}
             {/* First & Last Name — admin only */}
             {[
               { label: "First Name", value: teacherInfo.firstName },
               { label: "Last Name",  value: teacherInfo.lastName  },
               { label: "Country",    value: teacherInfo.country   },
-              { label: "Continent",  value: teacherInfo.continent },
+              ...(!studio ? [{ label: "Continent", value: teacherInfo.continent }] : []),
             ].map(({ label, value }) => (
               <div key={label}>
                 <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: c.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.07em" }}>
@@ -403,6 +409,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate, studio =
             <InfoRow label="Email"       value={teacherInfo.email}      c={c} />
             <InfoRow label="Phone"       value={teacherInfo.phone}      c={c} />
             <InfoRow label="Country"     value={teacherInfo.country}    c={c} />
+            {studio && <InfoRow label="Gender" value={teacherInfo.gender || 'Not provided'} c={c} />}
             <InfoRow label="Continent"   value={teacherInfo.continent}  c={c} />
           </div>
         )}

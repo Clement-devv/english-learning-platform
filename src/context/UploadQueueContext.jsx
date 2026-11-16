@@ -119,7 +119,7 @@ export function UploadQueueProvider({ children }) {
   // and a slow connection isn't split between several large files.
   const pump = useCallback(() => {
     if (busyRef.current) return;
-    const next = queueRef.current.find(q => q.status === 'queued' && q.blob);
+    const next = queueRef.current.find(q => q.status === 'queued' && q.blob && q.storagePending !== true);
     if (!next) return;
     busyRef.current = true;
     updateItem(next.id, { status: 'uploading', progress: 0, errorMsg: null });
@@ -167,14 +167,18 @@ export function UploadQueueProvider({ children }) {
       sessionId:   part.sessionId   || null,
       partNumber:  part.partNumber  || 1,
       startOffset: part.startOffset || 0,
-      progress: 0, status: 'queued', errorMsg: null, attempts: 0,
+      progress: 0, status: 'queued', storagePending: true, errorMsg: null, attempts: 0,
       startedAt: Date.now(),
     };
     setQueueSync(prev => [...prev, item]);
     // Store locally first so a crash mid-upload can't lose the part
-    savePart(persistable(item)).finally(() => pumpRef.current());
+    savePart(persistable(item)).then(() => {
+      // An earlier upload may finish while this blob is still being written.
+      updateItem(id, { storagePending: false });
+      pumpRef.current();
+    });
     return id;
-  }, [setQueueSync]);
+  }, [setQueueSync, updateItem]);
 
   /** Re-run a failed upload. No-op if the blob is gone. */
   const retryUpload = useCallback((id) => {

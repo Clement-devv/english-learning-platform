@@ -32,6 +32,7 @@ export function useRecording(bookingId, { captureThisTab = false } = {}) {
   const hasActiveUploadsRef = useRef(false);
   useEffect(() => { hasActiveUploadsRef.current = hasActiveUploads; }, [hasActiveUploads]);
 
+  const pendingStart = useRef(null);
   const mediaRecorderRef = useRef(null);   // recorder for the current part
   const recordStreamRef  = useRef(null);   // tab video + mixed audio, shared by all parts
   const mimeTypeRef      = useRef("video/webm");
@@ -74,7 +75,6 @@ export function useRecording(bookingId, { captureThisTab = false } = {}) {
       return;
     }
 
-    setRecordingError(null);
     const ext = blobType.includes("mp4") ? ".mp4" : ".webm";
     // Hand off to the global queue — upload runs in background regardless of
     // which page the teacher navigates to next.
@@ -96,15 +96,22 @@ export function useRecording(bookingId, { captureThisTab = false } = {}) {
       videoBitsPerSecond: 1_500_000,
       audioBitsPerSecond: 128_000,
     });
-    session.nextPart += 1;
+
     recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-    recorder.onstop = () => handlePartStop(chunks, {
-      sessionId:   session.id,
-      partNumber,
-      startOffset: Math.round((partStarted - session.startedAt) / 1000),
-      duration:    Math.round((Date.now() - partStarted) / 1000),
-    });
+    recorder.onstop = () => {
+      handlePartStop(chunks, {
+        sessionId:   session.id,
+        partNumber,
+        startOffset: Math.round((partStarted - session.startedAt) / 1000),
+        duration:    Math.round((Date.now() - partStarted) / 1000),
+      });
+      if (mediaRecorderRef.current === recorder) {
+        stopRecordingRef.current();
+        setRecordingError("Recording stopped unexpectedly. Check screen sharing and restart recording.");
+      }
+    };
     recorder.start(1000);
+    session.nextPart += 1;
     mediaRecorderRef.current = recorder;
     return recorder;
   }, [handlePartStop]);
@@ -134,6 +141,14 @@ export function useRecording(bookingId, { captureThisTab = false } = {}) {
     // Warn if a previous recording is still uploading — two large blobs in
     // memory simultaneously increases the risk of a tab crash on low-RAM devices.
     // Use ref to get the latest value without recreating this callback.
+    if (pendingStart.current || tabStreamRef.current) return;
+    if (!bookingId) {
+      setRecordingError("Class ID missing. Rejoin the class before recording.");
+      return;
+    }
+    const attempt = {};
+    pendingStart.current = attempt;
+    setRecordingError(null);
     if (hasActiveUploadsRef.current) setMemoryWarning(true);
     try {
       // 1. Capture a browser tab (video + tab audio output = the students' voices)
@@ -150,6 +165,10 @@ export function useRecording(bookingId, { captureThisTab = false } = {}) {
             systemAudio: "exclude",
           }
         : { video: { frameRate: 15 }, audio: true });
+      if (pendingStart.current !== attempt) {
+        tabStream.getTracks().forEach(track => track.stop());
+        return;
+      }
       tabStreamRef.current = tabStream;
 
       // Browsers without "this tab" support still show a picker — never record a
@@ -177,6 +196,10 @@ export function useRecording(bookingId, { captureThisTab = false } = {}) {
       // Microphone (teacher's voice) — optional, continue without if denied
       try {
         const micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        if (pendingStart.current !== attempt) {
+          micStream.getTracks().forEach(track => track.stop());
+          return;
+        }
         micStreamRef.current = micStream;
         const micSource = audioCtx.createMediaStreamSource(micStream);
         micSource.connect(destination);
@@ -184,15 +207,19 @@ export function useRecording(bookingId, { captureThisTab = false } = {}) {
         // Microphone access denied or unavailable — record without it
       }
 
+      if (pendingStart.current !== attempt) return;
+      if (tabStream.getVideoTracks()[0]?.readyState !== 'live') throw new Error("Screen sharing ended before recording started.");
+
       // 3. Build the recording stream: tab video + mixed audio
       recordStreamRef.current = new MediaStream([
         ...tabStream.getVideoTracks(),
         ...destination.stream.getAudioTracks(),
       ]);
 
-      mimeTypeRef.current = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-        ? "video/webm;codecs=vp9,opus"
-        : "video/webm";
+      const mime = ["video/webm;codecs=vp8,opus", "video/webm", "video/mp4"]
+        .find(type => MediaRecorder.isTypeSupported(type));
+      if (!mime) throw new Error("This browser cannot record a supported video format.");
+      mimeTypeRef.current = mime;
 
       // 4. Record in parts: part 1 starts now, a new part every RECORDING_PART_SECONDS
       sessionRef.current = { id: newSessionId(), startedAt: Date.now(), nextPart: 1 };
@@ -206,13 +233,17 @@ export function useRecording(bookingId, { captureThisTab = false } = {}) {
       setRecSeconds(0);
       recTimerRef.current = setInterval(() => setRecSeconds(s => s + 1), 1000);
     } catch (err) {
+      if (pendingStart.current !== attempt) return;
+      setRecordingError(err.name === "NotAllowedError" ? "Screen sharing was not started." : err.message || "Unable to start recording.");
       if (err.name !== "NotAllowedError") {
         console.error("Recording start error:", err);
       }
       clearTimeout(partTimerRef.current);
       releaseStreams();
+    } finally {
+      if (pendingStart.current === attempt) pendingStart.current = null;
     }
-  }, [startPart, schedulePartRotation, releaseStreams, captureThisTab]);
+  }, [bookingId, startPart, schedulePartRotation, releaseStreams, captureThisTab]);
 
   const stopRecording = useCallback(() => {
     clearInterval(recTimerRef.current);
@@ -234,15 +265,16 @@ export function useRecording(bookingId, { captureThisTab = false } = {}) {
 
   useEffect(() => {
     return () => {
+      pendingStart.current = null;
       clearTimeout(partTimerRef.current);
       clearInterval(recTimerRef.current);
       // Stopping still fires onstop, so the last part is queued for upload
       if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
-      tabStreamRef.current?.getTracks().forEach(t => t.stop());
-      micStreamRef.current?.getTracks().forEach(t => t.stop());
-      audioCtxRef.current?.close().catch(() => {});
+      mediaRecorderRef.current = null;
+      sessionRef.current = null;
+      releaseStreams();
     };
-  }, []);
+  }, [releaseStreams]);
 
   const formatRecTime = (s) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;

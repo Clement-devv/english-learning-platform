@@ -1,3 +1,4 @@
+import { withStandaloneFooter } from '../emails/standaloneFooter.js';
 import { usedClassCounts } from '../utils/standaloneClassCounts.js';
 import { standaloneMailRecipients } from '../utils/standaloneMailRecipients.js';
 import express from 'express';
@@ -35,7 +36,7 @@ import { makeManagedEmail } from '../utils/managedStudent.js';
 import { generateStudentId } from '../utils/studentIdGenerator.js';
 import { endSessionsAfterPasswordChange, notifySessionsRevoked } from '../utils/sessionManager.js';
 import { encrypt, decrypt } from '../utils/fieldEncryption.js';
-import { normalizeName, linkExpiresAt } from '../utils/shareLink.js';
+import { linkExpiresAt } from '../utils/shareLink.js';
 import { sendEmail } from '../emails/core.js';
 import logger from '../utils/logger.js';
 import { sendVideoFile } from '../utils/videoFile.js';
@@ -71,6 +72,7 @@ import agoraUsageRoutes from './agoraUsageRoutes.js';
 import { runNextJob, sweepExpiredSources } from '../utils/questionJobs.js';
 
 const router = express.Router(), app = express.Router();
+router.use((_req, _res, next) => withStandaloneFooter(next));
 const oid = value => typeof value === 'string' && mongoose.isValidObjectId(value);
 const token = () => crypto.randomBytes(32).toString('base64url');
 const hash = value => crypto.createHash('sha256').update(String(value)).digest('hex');
@@ -261,13 +263,15 @@ router.post('/admin/workspaces/:id/messages', verifySuperAdmin, strictLimiter, h
 router.post('/setup/:token', loginLimiter, handle(async (req, res) => {
   if (!validToken(req.params.token)) throw fail('Invalid or expired invitation.');
   const plain = passwordInput(req.body.password);
+  const { continent, gender } = req.body;
+  if (!teacherSchema.path('continent').enumValues.includes(continent) || !teacherSchema.path('gender').enumValues.includes(gender)) throw fail('Choose your continent and gender.');
   if (req.body.acceptTerms !== true) throw fail('Please accept the terms.');
   const w = await TeacherWorkspace.findOneAndUpdate({ inviteHash: hash(req.params.token), inviteExpires: { $gt: new Date() }, status: 'invited' }, { $set: { status: 'activating' } }, { new: true });
   if (!w) throw fail('Invalid or expired invitation.');
   try {
     const password = await hashPassword(plain);
     const db = await getDb(w.key), Teacher = model(db, 'Teacher', teacherSchema);
-    const owner = await Teacher.findOneAndUpdate({ email: w.email }, { $set: { firstName: w.name, lastName: '', password, active: true, status: 'active', continent: 'Asia', accountType: 'standalone', hasAcceptedTerms: true, termsAcceptedAt: new Date() } }, { upsert: true, new: true });
+    const owner = await Teacher.findOneAndUpdate({ email: w.email }, { $set: { firstName: w.name, lastName: '', password, active: true, status: 'active', continent, gender, accountType: 'standalone', hasAcceptedTerms: true, termsAcceptedAt: new Date() } }, { upsert: true, new: true });
     w.ownerId = owner._id; w.status = 'active'; w.inviteHash = undefined; w.inviteExpires = undefined;
     await w.save(); result(res, { email: w.email });
   } catch (error) { await TeacherWorkspace.updateOne({ _id: w._id, status: 'activating' }, { $set: { status: 'invited' } }); throw error; }
@@ -324,13 +328,16 @@ const familyAccess = async (req, res, next) => {
     const p = jwt.verify(access || '', crypto.createHmac('sha256', config.jwtSecret).update(`family:${req.familyGrant._id}`).digest('hex'), { algorithms: ['HS256'] });
     if (p.hash !== req.familyGrant.tokenHash || p.student !== String(req.familyGrant.studentId)) throw new Error();
     next();
-  } catch { res.status(403).json({ success: false, message: 'Please confirm the student name to open this page.' }); }
+  } catch { res.status(403).json({ success: false, message: 'Please open the learning page again.' }); }
 };
+publicFamily.get('/preview', handle(async (req, res) => {
+  const student = await Student(req).findById(req.familyGrant.studentId).select('firstName lastName').lean();
+  if (!student) throw fail('Student not found.');
+  result(res, { studentName: [student.firstName, student.lastName].filter(Boolean).join(' ') });
+}));
 publicFamily.post('/unlock', loginLimiter, handle(async (req, res) => {
   const s = await Student(req).findById(req.familyGrant.studentId).select('firstName lastName');
   if (!s) throw fail('Student not found.');
-  const supplied = normalizeName(text(req.body.studentName)).sort().join(' ');
-  if (![s.firstName, `${s.firstName} ${s.lastName}`].some(n => normalizeName(n).sort().join(' ') === supplied)) return res.status(403).json({ success: false, message: 'The student name does not match.' });
   const access = jwt.sign({ student: String(s._id), hash: req.familyGrant.tokenHash }, crypto.createHmac('sha256', config.jwtSecret).update(`family:${req.familyGrant._id}`).digest('hex'), { expiresIn: '2h', algorithm: 'HS256' });
   result(res, { access });
 }));
@@ -437,7 +444,7 @@ publicFamily.post('/schedule/:id/absence', strictLimiter, handle(async (req, res
       .catch(error => { logger.warn('Absence email center lookup failed', { ...logContext, error: error.message }); return null; });
     const sent = await sendEmail({
       kind: 'Student absence notification', to: standaloneMailRecipients(req.teacherWorkspace.email, center?.notificationEmail), centerName: center?.name,
-      subject: 'Student absence notification', text: message, html: `<p>${esc(message)}</p>`,
+      subject: 'Student absence notification', preheader: `${name} will be absent from ${title}.`, text: message, html: `<p>${esc(message)}</p>`,
     });
     emailSent = sent?.success === true && !sent.skipped;
     if (emailSent) logger.info('Absence email accepted', { ...logContext, messageId: sent.messageId });
@@ -591,7 +598,11 @@ app.get('/managed-students', handle(async (req, res) => {
   const students = await Student(req).find(filter).select('firstName lastName managedCenterId classCredits standaloneClassTracking prepaidCredits active +notifyEmail').sort({ createdAt: -1, _id: -1 }).limit(1000).lean();
   const grants = await TeacherFamilyGrant.find({ workspaceId: req.teacherWorkspace._id, enabled: true, expiresAt: { $gt: new Date() } }).select('+tokenEnc').lean();
   const used = await usedClassCounts(req.db, students.map(s => s._id));
-  result(res, students.map(s => ({ ...s, classesUsed: used.get(String(s._id)) || 0, parentLink: grants.find(g => String(g.studentId) === String(s._id))?.tokenEnc ? `${front()}/teacher-mode/family/${decrypt(grants.find(g => String(g.studentId) === String(s._id)).tokenEnc)}` : null })));
+  const tokens = new Map(grants.map(g => [String(g.studentId), g.tokenEnc]));
+  result(res, students.map(s => {
+    const id = String(s._id), tokenEnc = tokens.get(id);
+    return { ...s, classesUsed: used.get(id) || 0, parentLink: tokenEnc ? `${front()}/teacher-mode/family/${decrypt(tokenEnc)}` : null };
+  }));
 }));
 app.post('/managed-students', handle(async (req, res) => {
   if (await Student(req).countDocuments() >= 1000) throw fail('This workspace has reached its 1,000 student allowance.');
@@ -629,7 +640,7 @@ app.post('/managed-students/:id/email-link', strictLimiter, handle(async (req, r
   const g = await TeacherFamilyGrant.findOne({ workspaceId: req.teacherWorkspace._id, studentId: req.params.id, enabled: true, expiresAt: { $gt: new Date() } }).select('+tokenEnc');
   if (!s?.notifyEmail || !g) throw fail('Add a family email and create a parent link first.');
   const center = await teacherModeModels(req.db).ManagedCenter.findById(s.managedCenterId).select('name').lean();
-  await sendLink(s.notifyEmail, 'Your child’s learning updates', `${center?.name || req.teacherWorkspace.name} has shared a private learning page for ${s.firstName}. Confirm your child's name to open it.`, `${front()}/teacher-mode/family/${decrypt(g.tokenEnc)}`, center?.name);
+  await sendLink(s.notifyEmail, 'Your child’s learning updates', `${center?.name || req.teacherWorkspace.name} has shared a private learning page for ${s.firstName}. Open the link to view the learning page. Please keep it private.`, `${front()}/teacher-mode/family/${decrypt(g.tokenEnc)}`, center?.name);
   result(res, { sent: true });
 }));
 
@@ -666,15 +677,17 @@ app.get('/work', handle(async (req, res) => {
     if (!linkedFamilies.has(key)) linkedFamilies.set(key, new Set());
     linkedFamilies.get(key).add(String(link.studentId));
   }
-  function hasFamilyRecording(lesson) {
+  function needsRecordingShare(lesson) {
     const key = String(lesson._id);
-    if (visible.has(key)) return true;
+    // The badge corresponds to the eye controls on existing recordings.
+    const available = filesByLesson.get(key) || [];
+    if (!available.some(file => !file.autoDeleteAt || file.autoDeleteAt > now) || visible.has(key)) return false;
     const students = lesson.enrollments ? lesson.enrollments.map(e => e.studentId) : [lesson.studentId];
-    return students.length > 0 && students.every(s => linkedFamilies.get(key)?.has(String(s?._id || s)));
+    return !students.length || !students.every(s => linkedFamilies.get(key)?.has(String(s?._id || s)));
   }
   result(res, books.map(b => ({ ...b, ...(b.enrollments ? { isGroupClass: true, classTitle: b.title, studentId: { firstName: `${b.enrollments.length} students` } } : {}), update: byLesson.get(String(b._id))?.[0],
     needsSummary: b.status === 'completed' && !b.adminRejected && !(byLesson.get(String(b._id))?.length && byLesson.get(String(b._id)).every(u => u.published && u.summary?.trim())),
-    needsRecording: b.status === 'completed' && !b.adminRejected && !hasFamilyRecording(b) })).sort((a, b) => +new Date(b.scheduledTime) - +new Date(a.scheduledTime)));
+    needsRecording: b.status === 'completed' && !b.adminRejected && needsRecordingShare(b) })).sort((a, b) => +new Date(b.scheduledTime) - +new Date(a.scheduledTime)));
 }));
 // Serialize scheduling within this workspace, including requests from other API
 // workers. Every class creation below holds this short-lived master-DB lease.

@@ -343,6 +343,7 @@ router.post("/teacher/login", tenantMiddleware, loginLimiter, loginRules, valida
       firstName: teacher.firstName,
       lastName: teacher.lastName,
       continent: teacher.continent,
+      gender: teacher.gender,
       ratePerClass: teacher.ratePerClass,
       active: teacher.active,
       twoFactorEnabled: teacher.twoFactorEnabled,

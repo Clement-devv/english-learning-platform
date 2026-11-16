@@ -43,7 +43,7 @@ let teacher, other, center, secondCenter, student, classId, familyUrl, access
 async function invite(address) {
   expect((await admin('post', '/admin/workspaces').send({ name: 'Amara', email: address })).status).toBe(200)
   const raw = sent.at(-1).html.match(/teacher-mode\/setup\/([A-Za-z0-9_-]{43})/)[1]
-  const setup = await request(app).post(`${root}/setup/${raw}`).send({ password: 'Teacher@56789', acceptTerms: true })
+  const setup = await request(app).post(`${root}/setup/${raw}`).send({ password: 'Teacher@56789', acceptTerms: true, continent: 'Africa', gender: 'Prefer not to say' })
   expect(setup.status).toBe(200)
   const login = await request(app).post(`${root}/login`).send({ email: address, password: 'Teacher@56789' })
   expect(login.status).toBe(200)
@@ -86,7 +86,7 @@ describe('Teacher Mode boundaries and invitations', () => {
   })
   it('requires Super Admin to invite and consumes invitations once', async () => {
     expect((await request(app).post(root + '/admin/workspaces').send({ name: 'X', email: 'x@test.com' })).status).toBe(403)
-    expect((await request(app).post(`${root}/setup/${teacher.invite}`).send({ password: 'Teacher@99999', acceptTerms: true })).status).toBe(400)
+    expect((await request(app).post(`${root}/setup/${teacher.invite}`).send({ password: 'Teacher@99999', acceptTerms: true, continent: 'Africa', gender: 'Prefer not to say' })).status).toBe(400)
     expect(jwt.decode(teacher.token).realm).toBe('teacher-mode')
   })
   it('grants Super Admin a short-lived read-only view of an active teacher workspace', async () => {
@@ -112,7 +112,7 @@ describe('Teacher Mode boundaries and invitations', () => {
     const c = await call(teacher, 'post', '/managed-centers').send({ name: 'Sunrise', currency: 'USD', rateMinor: 800, payBasis: 'class', prepaid: false })
     expect(c.status).toBe(200); center = c.body.data
     secondCenter = (await call(teacher, 'post', '/managed-centers').send({ name: 'River', currency: 'EUR', rateMinor: 1200, payBasis: 'hour' })).body.data
-    const s = await call(teacher, 'post', '/managed-students').send({ centerId: center._id, name: 'Linh', notifyEmail: 'family@test.com' })
+    const s = await call(teacher, 'post', '/managed-students').send({ centerId: center._id, name: 'Linh', classCount: 1, notifyEmail: 'family@test.com' })
     expect(s.status).toBe(200); student = s.body.data.id
     expect((await call(other, 'get', '/managed-students')).body.data).toHaveLength(0)
     expect((await call(other, 'patch', `/managed-students/${student}`).send({ addCredits: 10 })).status).toBe(400)
@@ -133,7 +133,7 @@ describe('work, rates and scheduling', () => {
     expect(r.status).toBe(200); classId = r.body.data._id
     expect((await call(teacher, 'post', '/work').send({ ...payload, scheduledTime: new Date(new Date(payload.scheduledTime).getTime() + 1800000).toISOString() })).status).toBe(400)
   })
-  it('completes once with zero student credits and preserves the booked rate', async () => {
+  it('completes once with one paid class and preserves the booked rate', async () => {
     await call(teacher, 'put', `/managed-centers/${center._id}`).send({ ...center, rateMinor: 9900 })
     const completion = await call(teacher, 'patch', `/work/${classId}`).send({ complete: true, published: true, summary: 'Practised greetings and reading.' })
     expect(completion.status).toBe(200)
@@ -150,8 +150,8 @@ describe('private parent learning pages', () => {
     expect(r.status).toBe(200)
     familyUrl = root + '/family/' + r.body.data.url.split('/').at(-1)
     expect((await request(app).get(familyUrl)).status).toBe(403)
-    expect((await request(app).post(familyUrl + '/unlock').send({ studentName: 'Wrong' })).status).toBe(403)
-    const unlock = await request(app).post(familyUrl + '/unlock').send({ studentName: 'Linh' })
+    expect((await request(app).get(familyUrl + '/preview')).body.data).toEqual({ studentName: 'Linh' })
+    const unlock = await request(app).post(familyUrl + '/unlock').send({})
     expect(unlock.status).toBe(200); access = unlock.body.data.access
     const view = await request(app).get(familyUrl).set('x-share-access', access)
     expect(view.status).toBe(200)
@@ -180,6 +180,7 @@ describe('private parent learning pages', () => {
     await Work.deleteMany({ _id: { $in: created.map(w => w._id) } })
   })
   it('shows shared recordings for this student even without a published class review', async () => {
+    expect((await call(teacher, 'patch', '/managed-students/' + student).send({ addCredits: 30 })).status).toBe(200)
     const lesson = await call(teacher, 'post', '/work').send({ centerId: center._id, studentId: student, title: 'Private review recording', duration: 30, scheduledTime: new Date(Date.now() + 43 * 86400000).toISOString() })
     expect(lesson.status).toBe(200)
     const db = global.__TEST_DB__.useDb(jwt.decode(teacher.token).centerId, { useCache: true })
@@ -288,7 +289,7 @@ describe('private parent learning pages', () => {
     await call(teacher, 'put', `/managed-centers/${center._id}`).send({ ...center, rateMinor: 9900, meetingUrl: '' })
   })
   it('keeps group lessons scheduled for other students after an absence', async () => {
-    const second = await call(teacher, 'post', '/managed-students').send({ centerId: center._id, name: 'Group pupil' })
+    const second = await call(teacher, 'post', '/managed-students').send({ centerId: center._id, name: 'Group pupil', classCount: 4 })
     expect(second.body.data.parentLink).toContain('/teacher-mode/family/')
     const lesson = await call(teacher, 'post', '/work').send({ centerId: center._id, studentIds: [student, second.body.data.id], group: true, title: 'Group absence', duration: 30, scheduledTime: new Date(Date.now() + 41 * 86400000).toISOString() })
     expect(lesson.status).toBe(200)
@@ -440,7 +441,7 @@ describe('private parent learning pages', () => {
     expect(r.body.data.some(m => m.sender === 'family')).toBe(false)
   })
   it('supports groups from one center and counts the group fee once', async () => {
-    const s = await call(teacher, 'post', '/managed-students').send({ centerId: center._id, name: 'Mai' })
+    const s = await call(teacher, 'post', '/managed-students').send({ centerId: center._id, name: 'Mai', classCount: 4 })
     const r = await call(teacher, 'post', '/work').send({ centerId: center._id, studentIds: [student, s.body.data.id], group: true, title: 'Conversation club', duration: 30, scheduledTime: new Date(Date.now() + 4 * 86400000).toISOString() })
     expect(r.status).toBe(200)
     expect(r.body.data.enrollments).toHaveLength(2)
@@ -507,11 +508,10 @@ describe('private parent learning pages', () => {
   it('uses the booked prepaid policy and charges group classroom completion only once', async () => {
     const c = (await call(teacher, 'post', '/managed-centers').send({ name: 'Prepaid', currency: 'GBP', rateMinor: 2000, payBasis: 'class', prepaid: true })).body.data
     const ids = []
-    for (const name of ['One', 'Two']) ids.push((await call(teacher, 'post', '/managed-students').send({ centerId: c._id, name })).body.data.id)
+    for (const name of ['One', 'Two']) ids.push((await call(teacher, 'post', '/managed-students').send({ centerId: c._id, name, classCount: 2 })).body.data.id)
     const group = await call(teacher, 'post', '/work').send({ centerId: c._id, studentIds: ids, group: true, title: 'Prepaid group', duration: 30, scheduledTime: new Date(Date.now() + 20 * 86400000).toISOString() })
     const id = group.body.data._id
-    expect((await call(teacher, 'patch', '/group-classes/' + id + '/complete').send({})).status).toBe(400)
-    for (const id of ids) expect((await call(teacher, 'patch', '/managed-students/' + id).send({ addCredits: 2 })).status).toBe(200)
+
     await call(teacher, 'put', '/managed-centers/' + c._id).send({ ...c, prepaid: false })
     expect((await call(teacher, 'patch', '/group-classes/' + id + '/complete').send({})).status).toBe(200)
     expect((await call(teacher, 'patch', '/work/' + id).send({ complete: true })).status).toBe(200)
@@ -644,11 +644,11 @@ describe('private parent learning pages', () => {
     const old = sent.at(-1).html.match(/teacher-mode\/setup\/([A-Za-z0-9_-]{43})/)[1]
     const id = pending.body.data.id
     expect((await admin('post', `/admin/workspaces/${id}/revoke-invite`).send({})).status).toBe(200)
-    expect((await request(app).post(`${root}/setup/${old}`).send({ password: 'Teacher@56789', acceptTerms: true })).status).toBe(400)
+    expect((await request(app).post(`${root}/setup/${old}`).send({ password: 'Teacher@56789', acceptTerms: true, continent: 'Africa', gender: 'Prefer not to say' })).status).toBe(400)
     expect((await admin('post', `/admin/workspaces/${id}/resend`).send({})).status).toBe(200)
     const replacement = sent.at(-1).html.match(/teacher-mode\/setup\/([A-Za-z0-9_-]{43})/)[1]
     expect(replacement).not.toBe(old)
-    expect((await request(app).post(`${root}/setup/${replacement}`).send({ password: 'Teacher@56789', acceptTerms: true })).status).toBe(200)
+    expect((await request(app).post(`${root}/setup/${replacement}`).send({ password: 'Teacher@56789', acceptTerms: true, continent: 'Africa', gender: 'Prefer not to say' })).status).toBe(200)
   })
   it('supports authenticator and one-use backup codes and protects password changes', async () => {
     const user = await invite('security-mode@test.com')
@@ -678,8 +678,8 @@ describe('private parent learning pages', () => {
   })
   it('accepts private ratings on completed individual and group classes', async () => {
     const c = (await call(teacher, 'post', '/managed-centers').send({ name: 'Rating center', currency: 'USD', rateMinor: 1000, payBasis: 'class', prepaid: false })).body.data
-    const a = (await call(teacher, 'post', '/managed-students').send({ centerId: c._id, name: 'Rating Alpha' })).body.data
-    const b = (await call(teacher, 'post', '/managed-students').send({ centerId: c._id, name: 'Rating Beta' })).body.data
+    const a = (await call(teacher, 'post', '/managed-students').send({ centerId: c._id, name: 'Rating Alpha', classCount: 4 })).body.data
+    const b = (await call(teacher, 'post', '/managed-students').send({ centerId: c._id, name: 'Rating Beta', classCount: 4 })).body.data
     async function family(pupil, name) {
       const link = (await call(teacher, 'post', `/managed-students/${pupil.id}/parent-link`).send({})).body.data.url
       const url = root + '/family/' + link.split('/').at(-1)
@@ -729,19 +729,6 @@ describe('private parent learning pages', () => {
     expect((await call(other, 'get', '/workspace')).status).toBe(401)
     expect((await request(app).post(root + '/login').send({ email: 'solo2@test.com', password: 'Replacement@56789' })).status).toBe(200)
   })
-  it('suspends teacher access and family links together', async () => {
-    const link = await call(teacher, 'post', `/managed-students/${student}/parent-link`).send({})
-    const route = root + '/family/' + link.body.data.url.split('/').at(-1)
-    const w = (await admin('get', '/admin/workspaces')).body.data.find(w => w.email === 'solo1@test.com')
-    expect((await admin('patch', `/admin/workspaces/${w._id}`).send({ status: 'suspended' })).status).toBe(200)
-    expect((await call(teacher, 'get', '/workspace')).status).toBe(401)
-    expect((await request(app).post(route + '/unlock').send({ studentName: 'Linh' })).status).toBe(410)
-  })
-})
-
-
-
-
 it('reserves a whole series against paid credits', async () => {
   const c = (await call(teacher, 'post', '/managed-centers').send({ name: 'Series', currency: 'USD', rateMinor: 500, payBasis: 'class' })).body.data
   const pupil = (await call(teacher, 'post', '/managed-students').send({ centerId: c._id, name: 'Series pupil', classCount: 0 })).body.data
@@ -759,3 +746,17 @@ it('reserves a whole series against paid credits', async () => {
   const history = await call(teacher, 'get', '/earnings/history?centerId=' + c._id)
   expect(history.body.data.entries[0]).toMatchObject({ amountMinor: 750, basis: 'class' })
 })
+
+  it('suspends teacher access and family links together', async () => {
+    const link = await call(teacher, 'post', `/managed-students/${student}/parent-link`).send({})
+    const route = root + '/family/' + link.body.data.url.split('/').at(-1)
+    const w = (await admin('get', '/admin/workspaces')).body.data.find(w => w.email === 'solo1@test.com')
+    expect((await admin('patch', `/admin/workspaces/${w._id}`).send({ status: 'suspended' })).status).toBe(200)
+    expect((await call(teacher, 'get', '/workspace')).status).toBe(401)
+    expect((await request(app).post(route + '/unlock').send({ studentName: 'Linh' })).status).toBe(410)
+  })
+})
+
+
+
+

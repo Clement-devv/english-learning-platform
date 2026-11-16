@@ -1,4 +1,5 @@
 // @ts-check
+import { withStandaloneFooter } from '../emails/standaloneFooter.js';
 import { isIP } from 'net';
 import { setRequestCenter } from './requestMonitor.js';
 import Center from '../models/master/Center.js';
@@ -24,7 +25,7 @@ const TENANT_TTL = 60; // seconds
  */
 export const tenantMiddleware = async (req, res, next) => {
   try {
-    if (req.teacherWorkspace || await publicTeacherWorkspace(req)) return next();
+    if (req.teacherWorkspace || await publicTeacherWorkspace(req)) return withStandaloneFooter(next);
     // Strip port so "myschool.com:5000" and "myschool.com" resolve the same key.
     const host = (req.headers.host || '').split(':')[0];
 

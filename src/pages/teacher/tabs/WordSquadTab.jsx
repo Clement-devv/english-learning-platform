@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, BookOpen, Copy, Download, Link2, Play, Plus, Sparkles, Trash2, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../../api';
-import { teacherModeLink } from '../../../utils/teacherMode';
+import { teacherModeKey, teacherModeLink } from '../../../utils/teacherMode';
 import { questionErrors, publishErrors, parseQuestionsCsv, LEVELS, LIMITS } from '../../../../server/utils/questionRules.js';
 import { EXAMPLE_SET_TITLE, EXAMPLE_QUESTIONS, exampleCsv } from '../../../../server/utils/exampleQuestions.js';
 import WordSquadAi from './WordSquadAi.jsx';
@@ -391,14 +391,14 @@ function GameLinks({ assignment, onClose, flash }) {
       </div>
       {!assignment.active && <p className="wst-muted" style={{ margin: 0 }}>This game is stopped — the links work again when you restart it.</p>}
 
-      <div className="wst-link">
+      {!teacherModeKey() && <div className="wst-link">
         <b>Students who log in</b>
         <span className="wst-muted">One link for everyone in this game. They log in (if they aren't already) and the game opens. Others can't play it.</span>
         <div className="wst-row">
           <input className="wst-input wst-link-url" readOnly value={loginUrl} onFocus={(e) => e.target.select()} aria-label="Game link for students who log in" />
           <button type="button" className="wst-btn wst-btn--sm wst-btn--primary" onClick={() => copy(loginUrl, 'Link')}><Copy size={14} /> Copy</button>
         </div>
-      </div>
+      </div>}
 
       <div className="wst-link">
         <b>Students without a login</b>
@@ -437,7 +437,7 @@ export default function WordSquadTab({ isDarkMode }) {
   const [toast, setToast] = useState(null);
   const [linksFor, setLinksFor] = useState(null);
   const navigate = useNavigate();
-  const testPlay = useCallback((id) => navigate(`/teacher/games/word-squad/test/${id}`), [navigate]);
+  const testPlay = useCallback((id) => navigate(`/${teacherModeKey() ? "teacher-mode" : "teacher"}/games/word-squad/test/${id}`), [navigate]);
 
   const flash = useCallback((text, bad = false) => {
     setToast({ text, bad });

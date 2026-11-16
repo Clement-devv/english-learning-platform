@@ -2,7 +2,7 @@ import StudioLanguageSwitch from './StudioLanguageSwitch';
 import { useStudioLanguage } from './useStudioLanguage';
 import { studioText } from './studioLanguage';
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, lazy, Suspense } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useNavigationType } from 'react-router-dom';
 import { BookOpen, Building2, Users, CalendarDays, Link2, Wallet, MessageCircle, LogOut, SunMoon, ArrowUpRight, GraduationCap, Video, Gamepad2, ListChecks, ShieldCheck } from 'lucide-react';
 import api from '../../api';
 import { useAuth } from '../../context/AuthContext';
@@ -62,7 +62,17 @@ export default function TeacherModeDashboard() {
   const auth = useAuth(), navigate = useNavigate(), location = useLocation();
   const [showSessions, setShowSessions] = useState(false), [showPassword, setShowPassword] = useState(false);
   const [dark, setDark] = useState(() => localStorage.getItem('teacherModeDark') === 'true');
-  const [tab, setTab] = useState(() => { const state = location.state; return state?.classMissed ? 'completed-classes' : state?.classCompleted ? 'class-summaries' : ({ payment: 'earnings', 'completed-classes': 'completed-classes', 'class-summaries': 'class-summaries', classes: 'classes' }[state?.activeTab] || 'overview'); }), [centerId, setCenterId] = useState('');
+  const navigationType = useNavigationType();
+  const [tab, setTab] = useState(() => {
+    const navigation = window.performance.getEntriesByType?.('navigation')[0];
+    if (navigationType === 'POP' && navigation?.type === 'reload') return 'overview';
+    const state = location.state;
+    if (state?.classMissed) return 'completed-classes';
+    if (state?.classCompleted) return 'class-summaries';
+    const shortcuts = { payment: 'earnings', 'completed-classes': 'completed-classes', 'class-summaries': 'class-summaries', classes: 'classes' };
+    return shortcuts[state?.activeTab] || (new URLSearchParams(location.search).get('tab') === 'games' ? 'games' : 'overview');
+  });
+  const [centerId, setCenterId] = useState('');
   const [centers, setCenters] = useState([]), [students, setStudents] = useState([]), [work, setWork] = useState([]), [earnings, setEarnings] = useState([]), [messages, setMessages] = useState([]);
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
   const [recipient, setRecipient] = useState('');
@@ -75,8 +85,6 @@ export default function TeacherModeDashboard() {
   };
   const current = centers.find(c => c._id === centerId);
   const activeRefresh = useRef(null);
-  const retryAfter = useRef(0);
-  const failures = useRef(0);
   const failedPaths = useRef([]);
   const [refreshError, setRefreshError] = useState('');
   const needsEarnings = tab === 'earnings';
@@ -91,7 +99,8 @@ export default function TeacherModeDashboard() {
       ['/work', 'classes', setWork], ['/earnings', 'earnings', setEarnings], ['/messages', 'messages', setMessages],
     ].filter(([path]) => (path !== '/earnings' || needsEarnings) && (!options?.failedOnly || failedPaths.current.includes(path)));
     const results = await Promise.allSettled(sections.map(async ([path, , update]) => {
-      const response = await api.get(path, { signal: controller.signal });
+      const params = path === '/messages' && ['parents', 'messages'].includes(tab) ? { read: true, family: tab === 'parents' } : undefined;
+      const response = await api.get(path, { signal: controller.signal, params });
       if (!controller.signal.aborted) update(response.data.data);
     }));
     if (controller.signal.aborted) return;
@@ -99,36 +108,26 @@ export default function TeacherModeDashboard() {
     const failed = sections.filter((_, index) => results[index].status === 'rejected');
     failedPaths.current = failed.map(([path]) => path);
     setRefreshError(failed.length ? `Could not update ${failed.map(([, label]) => label).join(', ')}.` : '');
-    failures.current = failed.length ? Math.min(4, failures.current + 1) : 0;
-    retryAfter.current = Date.now() + Math.min(300000, 30000 * 2 ** failures.current);
     setLoading(false);
-  }, [navigate, needsEarnings, centerId]);
+  }, [navigate, needsEarnings, centerId, tab]);
   useEffect(() => {
-    const check = (resume = false) => {
-      if (!document.hidden && navigator.onLine !== false && (resume || Date.now() >= retryAfter.current)) {
-        void refresh({ background: true });
-      }
+    const resume = () => {
+      if (!document.hidden && navigator.onLine !== false) void refresh({ background: true });
     };
-    const resume = () => check(true);
-    check(true);
-    const timer = setInterval(() => check(), 30000);
+    resume();
     document.addEventListener('visibilitychange', resume);
     window.addEventListener('online', resume);
     return () => {
-      clearInterval(timer);
       document.removeEventListener('visibilitychange', resume);
       window.removeEventListener('online', resume);
       activeRefresh.current?.abort();
       activeRefresh.current = null;
     };
-  }, [refresh]);
+  }, [refresh, tab]);
   useLayoutEffect(() => {
     if (teacherModeKey()) sessionStorage.setItem('teacherModeCenter', centerId);
     setRecipient('');
   }, [centerId]);
-  useEffect(() => {
-    if (['parents', 'messages'].includes(tab)) api.get('/messages', { params: { read: true, family: tab === 'parents' } }).then(r => setMessages(r.data.data)).catch(() => {});
-  }, [tab]);
   const run = async action => { setBusy(true); setError(''); setNotice(''); try { await action(); await refresh(); setNotice(previous => previous || 'Saved to your workspace.'); } catch (e) { setError(e.response?.data?.message || e.message || 'Please retry.'); } finally { setBusy(false); } };
   const copy = async url => { try { await navigator.clipboard.writeText(url); setNotice('Parent link copied. Share it privately with the family.'); } catch { setNotice(`Copy this private link: ${url}`); } };
   const teacherInfo = auth.user || JSON.parse(sessionStorage.getItem('teacherInfo') || '{}');
@@ -165,7 +164,7 @@ export default function TeacherModeDashboard() {
       {tab === 'schedule' && <TeacherCalendar work={filteredWork} centers={centers} onLesson={() => switchTab('classes')} />}
       {tab === 'profile' && <><StudioIntro eyebrow="THE PERSON BEHIND THE PROGRESS" title="Your profile. Your peace of mind.">Make this space yours, and keep your account secure.</StudioIntro><Suspense fallback={<div className="tm-card" role="status">Loading profile…</div>}><div className="tm-tool tm-tool-profile"><Profile studio teacherInfo={teacherInfo} isDarkMode={dark} onUpdate={user => auth.setUser(user)} /></div><section className="tm-card tm-security-settings"><div className="tm-form-heading"><span className="tm-round-icon"><ShieldCheck size={19} /></span><div><span className="tm-eyebrow">YOUR WORKSPACE, PROTECTED</span><h3>Account security</h3></div></div><div className="tm-security-actions"><div><strong>Password & devices</strong><p>Keep your password fresh and check where you’re signed in.</p></div><div className="tm-actions"><button onClick={() => setShowPassword(true)}>Change password</button><button onClick={() => setShowSessions(true)}>Manage devices</button></div></div><TwoFactorManagement userType="teacher" /></section><div className="tm-studio-dialogs">{showSessions && <SessionManagement isOpen onClose={() => setShowSessions(false)} />}{showPassword && <ChangePassword onClose={() => setShowPassword(false)} onSuccess={() => { auth.logout(); navigate('/teacher-mode/login', { replace: true }); }} />}</div></Suspense></>}
       {tab === 'resources' && <TeacherResources centerId={centerId} archived={current?.archived} />}
-      {['homework', 'quizzes', 'games', 'recordings', 'vocab'].includes(tab) && <><StudioIntro eyebrow={toolCopy[tab][0]} title={toolCopy[tab][1]}>{toolCopy[tab][2]}</StudioIntro><div className={`tm-tool tm-tool-${tab}`}><Suspense fallback={<div className="tm-card" role="status">Loading teaching tools…</div>}>{tab === 'homework' && <Homework key={centerId} {...props} />}{tab === 'quizzes' && <Quiz key={centerId} {...props} />}{tab === 'games' && <Games key={centerId} isDarkMode={dark} />}{tab === 'recordings' && <Recordings key={centerId} isDarkMode={dark} studio />}{tab === 'vocab' && <Vocab key={centerId} {...props} />}</Suspense></div></>}
+      {['homework', 'quizzes', 'games', 'recordings', 'vocab'].includes(tab) && <><StudioIntro eyebrow={toolCopy[tab][0]} title={toolCopy[tab][1]}>{toolCopy[tab][2]}</StudioIntro><div className={`tm-tool tm-tool-${tab}`}><Suspense fallback={<div className="tm-card" role="status">Loading teaching tools…</div>}>{tab === 'homework' && <Homework key={centerId} {...props} />}{tab === 'quizzes' && <Quiz key={centerId} {...props} />}{tab === 'games' && <Games key={centerId} isDarkMode={dark} />}{tab === 'recordings' && <Recordings key={centerId} isDarkMode={dark} studio onVisibilityChange={refresh} />}{tab === 'vocab' && <Vocab key={centerId} {...props} />}</Suspense></div></>}
       {tab === 'earnings' && <EarningsSection earnings={earnings} onCenterChange={setCenterId} centerId={centerId} center={current} busy={busy} run={run} onNavigate={switchTab} />}
       {['parents', 'messages'].includes(tab) && <ConversationsSection key={tab} platform={tab === 'messages'} students={filteredStudents} messages={messages.filter(m => !m.studentId || filteredStudents.some(s => s._id === m.studentId))} recipient={recipient} setRecipient={setRecipient} busy={busy} run={run} />}
       </Suspense>}<TeacherGlassFooter compact={tab !== 'overview'} onNavigate={switchTab} dark={dark} onToggleDark={toggleDark} /></section></main>;

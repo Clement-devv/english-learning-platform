@@ -484,6 +484,13 @@ router.patch("/:id/profile", validateObjectId("id"), verifyToken, requireOwnerOr
                      "yearsOfExperience", "specializations", "certifications",
                      "bankName", "accountNumber", "accountName"];
     const updates = {};
+    if (req.teacherWorkspace) {
+      for (const field of ['continent', 'gender']) {
+        if (req.body[field] === undefined) continue;
+        if (!teacherSchema.path(field).enumValues.includes(req.body[field])) return badRequest(res, 'Invalid ' + field);
+        updates[field] = req.body[field];
+      }
+    }
     for (const key of ALLOWED) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
