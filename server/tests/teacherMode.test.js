@@ -531,7 +531,7 @@ describe('private parent learning pages', () => {
     expect(history.body.data.entries).toHaveLength(20)
     expect((await call(other, 'get', '/earnings/history?centerId=' + c._id)).status).toBe(400)
   })
-  it('tracks a center salary period ending on its chosen day', async () => {
+  it('starts a fresh center salary period on payday and preserves prior earnings', async () => {
     const created = await call(teacher, 'post', '/managed-centers').send({ name: 'Midmonth', currency: 'USD', rateMinor: 1000, payBasis: 'class', salaryDay: 15 })
     expect(created.status).toBe(200)
     const c = created.body.data
@@ -542,10 +542,14 @@ describe('private parent learning pages', () => {
     const db = global.__TEST_DB__.useDb(jwt.decode(teacher.token).centerId, { useCache: true })
     const pupil = (await call(teacher, 'post', '/managed-students').send({ centerId: c._id, name: 'Period pupil' })).body.data.id
     const base = { teacherId: jwt.decode(teacher.token).id, studentId: pupil, managedCenterId: c._id, classTitle: 'Period lesson', duration: 60, status: 'completed', standalonePay: { currency: 'USD', basis: 'class', rateMinor: 1000, amountMinor: 1000, credits: false } }
-    const start = new Date(existing.salaryPeriod.start)
+    const { localDayRange } = await import('../utils/dailyClassReport.js')
+    const { start } = localDayRange(existing.salaryPeriod.start.slice(0, 10), existing.salaryPeriod.timezone)
     await db.models.Booking.create({ ...base, scheduledTime: start, completedAt: start })
     await db.models.Booking.create({ ...base, scheduledTime: new Date(+start - 1), completedAt: new Date(+start - 1) })
-    const totals = (await call(teacher, 'get', '/earnings')).body.data.find(x => x._id === c._id).totals[0]
+    const periodReport = (await call(teacher, 'get', '/earnings')).body.data.find(x => x._id === c._id)
+    const totals = periodReport.totals[0]
+    expect(periodReport.currentTotals[0]).toMatchObject({ earned: 1000, lessons: 1 })
+    expect(periodReport.periodHistory[0]).toMatchObject({ earned: 1000, lessons: 1 })
     expect(totals).toMatchObject({ earned: 2000, periodEarned: 1000, periodLessons: 1 })
     expect((await call(teacher, 'put', `/managed-centers/${c._id}`).send({ ...c, salaryDay: 30 })).body.data.salaryDay).toBe(30)
   })

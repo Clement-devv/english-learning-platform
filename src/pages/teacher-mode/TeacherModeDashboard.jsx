@@ -1,3 +1,4 @@
+import { useStudioInstall } from './useStudioInstall';
 import StudioLanguageSwitch from './StudioLanguageSwitch';
 import { useStudioLanguage } from './useStudioLanguage';
 import { studioText } from './studioLanguage';
@@ -54,10 +55,11 @@ const tabs = [
   ['games', 'Games', Gamepad2], ['vocab', 'Vocabulary', BookOpen],
   ['resources', 'Teaching library', BookOpen],
   ['parents', 'Parent responses', Link2], ['earnings', 'Earnings', Wallet],
-  ['messages', 'Clemify messages', MessageCircle], ['profile', 'Profile & security', Users],
+  ['messages', 'Message E.G.O', MessageCircle], ['profile', 'Profile & security', Users],
 ];
 
 export default function TeacherModeDashboard() {
+  useStudioInstall();
   useStudioLanguage('teacher');
   const auth = useAuth(), navigate = useNavigate(), location = useLocation();
   const [showSessions, setShowSessions] = useState(false), [showPassword, setShowPassword] = useState(false);
@@ -143,7 +145,7 @@ export default function TeacherModeDashboard() {
     {teacherInfo.inspection && <div role="status" style={{ position: 'fixed', zIndex: 9999, top: 0, left: '50%', transform: 'translateX(-50%)', padding: '10px 18px', borderRadius: '0 0 12px 12px', background: '#283d32', color: '#fff', boxShadow: '0 4px 16px #0003' }}>Super Admin view · Read-only · Session expires in 10 minutes <button type="button" style={{ marginLeft: 12, color: '#fff', background: 'transparent', border: '1px solid #ffffff99', borderRadius: 6, padding: '4px 9px' }} onClick={() => { sessionStorage.removeItem('teacherToken'); sessionStorage.removeItem('teacherInfo'); window.close(); }}>Exit view</button></div>}
     <a className="tm-skip-link" href="#teacher-workspace-content">Skip to workspace</a>
     <aside className="tm-sidebar">
-      <a className="tm-brand" href="/teacher-mode/dashboard"><span className="tm-brand-symbol" aria-hidden="true">E.</span><span className="tm-brand-name">E.G.O<span>THE TEACHER STUDIO</span></span></a>
+      <a className="tm-brand" href="/teacher-mode/dashboard"><img src="/ego-studio/icon-192.png" width="40" height="40" alt="" style={{ borderRadius: 9 }} /><span className="tm-brand-name">E.G.O<span>THE TEACHER STUDIO</span></span></a>
       <div className="tm-studio-badge"><span className="tm-status-dot" />{studioText("Independent workspace")}</div>
       <nav aria-label="Teacher workspace">{tabs.map(([id, label, Icon]) => <div className="tm-nav-item" key={id}>{['overview', 'homework', 'parents'].includes(id) && <span className="tm-nav-label">{id === 'overview' ? 'YOUR WORKSPACE' : id === 'homework' ? 'TEACHING TOOLS' : 'CONNECTIONS & BUSINESS'}</span>}<button className={tab === id ? 'active' : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => switchTab(id)}><Icon size={17} strokeWidth={1.6} /><span>{studioText(label)}</span>{pendingMaterials[id] > 0 && <span className="tm-material-reminder" aria-label={pendingMaterials[id] + ' classes to share with families'}>{pendingMaterials[id]}</span>}{id === 'parents' && unreadParents > 0 && <span className="tm-unread-count">{unreadParents}</span>}</button></div>)}</nav>
       <div className="tm-sidebar-bottom"><div className="tm-sidebar-note"><span className="tm-eyebrow">A WINDOW INTO LEARNING</span><p>Great teaching.<br />Worth sharing.</p><button onClick={() => switchTab('parent-links')}>{studioText("Create a parent link")}<ArrowUpRight size={14} /></button></div>

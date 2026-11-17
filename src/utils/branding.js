@@ -167,6 +167,9 @@ export const applyBranding = (branding, center) => {
     document.head.appendChild(link);
   }
 
+  // Teacher Studio owns its install identity while its login or dashboard is mounted.
+  if (document.querySelector('link[rel="manifest"]')?.getAttribute('href') === '/ego-studio/manifest.webmanifest') return;
+
   // 7. Page title
   if (center?.centerName) {
     document.title = center.centerName;

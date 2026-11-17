@@ -1,3 +1,4 @@
+import { localDateStr, safeTimeZone } from '../utils/dailyClassReport.js';
 import { withStandaloneFooter } from '../emails/standaloneFooter.js';
 import { usedClassCounts } from '../utils/standaloneClassCounts.js';
 import { standaloneMailRecipients } from '../utils/standaloneMailRecipients.js';
@@ -205,7 +206,7 @@ router.post('/admin/workspaces', verifySuperAdmin, strictLimiter, handle(async (
   if (await TeacherWorkspace.exists({ email: address })) throw fail('This teacher already has an invitation or workspace.');
   const id = new mongoose.Types.ObjectId(), raw = token();
   const w = await TeacherWorkspace.create({ _id: id, key: `tw-${id}`, email: address, name, invitedBy: req.superAdmin._id, inviteHash: hash(raw), inviteExpires: new Date(Date.now() + 48 * 3600000) });
-  try { await sendLink(address, 'Set up your Clemify Teacher Mode account', `${name}, you have been invited to Teacher Mode. This invitation expires in 48 hours.`, `${front()}/teacher-mode/setup/${raw}`); }
+  try { await sendLink(address, 'Set up your E.G.O Teacher Mode account', `${name}, you have been invited to E.G.O Teacher Mode. This invitation expires in 48 hours.`, `${front()}/teacher-mode/setup/${raw}`, 'E.G.O'); }
   catch (error) { await TeacherWorkspace.deleteOne({ _id: w._id, status: 'invited' }); throw error; }
   result(res, { id: w._id, name, email: address, status: w.status });
 }));
@@ -214,7 +215,7 @@ router.post('/admin/workspaces/:id/resend', verifySuperAdmin, strictLimiter, han
   const raw = token();
   const w = await TeacherWorkspace.findOneAndUpdate({ _id: req.params.id, ownerId: { $exists: false }, status: { $in: ['invited', 'suspended'] } }, { $set: { status: 'invited', inviteHash: hash(raw), inviteExpires: new Date(Date.now() + 48 * 3600000) } }, { new: true });
   if (!w) throw fail('Only pending invitations can be resent.');
-  await sendLink(w.email, 'Set up your Clemify Teacher Mode account', 'Your new invitation expires in 48 hours.', `${front()}/teacher-mode/setup/${raw}`);
+  await sendLink(w.email, 'Set up your E.G.O Teacher Mode account', 'Use this new invitation to set up your E.G.O Teacher Mode account. The link expires in 48 hours.', `${front()}/teacher-mode/setup/${raw}`, 'E.G.O');
   result(res, { sent: true });
 }));
 router.post('/admin/workspaces/:id/revoke-invite', verifySuperAdmin, strictLimiter, handle(async (req, res) => {
@@ -589,7 +590,14 @@ const centerFields = (body, current = {}) => {
 app.post('/managed-centers', handle(async (req, res) => result(res, await teacherModeModels(req.db).ManagedCenter.create(centerFields(req.body)))));
 app.put('/managed-centers/:id', handle(async (req, res) => {
   const c = await getCenter(req, req.params.id, false);
-  c.set(centerFields(req.body, c)); c.archived = req.body.archived === true; await c.save();
+  const fields = centerFields(req.body, c);
+  if (fields.salaryDay !== c.salaryDay) {
+    const today = localDateStr(new Date(), safeTimeZone(req.center.timezone));
+    if (!c.salarySchedule.length) c.salarySchedule.push({ from: '1970-01-01', day: c.salaryDay || 31 });
+    c.salarySchedule = c.salarySchedule.filter(rule => rule.from !== today);
+    c.salarySchedule.push({ from: today, day: fields.salaryDay });
+  }
+  c.set(fields); c.archived = req.body.archived === true; await c.save();
   await Student(req).updateMany({ managedCenterId: c._id }, { $set: { prepaidCredits: c.prepaid } });
   result(res, c);
 }));
@@ -811,26 +819,83 @@ app.patch('/work/:id', handle(async (req, res) => {
 }));
 // Pay periods end on the configured day (inclusive); 29–31 clamp to the
 // month's last day. UTC matches the workspace's existing salary charge periods.
-const salaryPeriod = (salaryDay, now = new Date()) => {
-  const y = now.getUTCFullYear(), m = now.getUTCMonth(), today = now.getUTCDate();
-  const endDay = (year, month) => Math.min(salaryDay, new Date(Date.UTC(year, month + 1, 0)).getUTCDate());
-  const endMonth = today <= endDay(y, m) ? m : m + 1;
-  const end = new Date(Date.UTC(y, endMonth, endDay(y, endMonth) + 1));
-  const previous = new Date(Date.UTC(y, endMonth - 1, endDay(y, endMonth - 1) + 1));
-  return { start: previous, end, payDate: new Date(+end - 86400000) };
-};
+// Dates here represent local calendar days. The payday starts the next cycle.
+function salaryPeriod(salaryDay, day) {
+  const date = new Date(day);
+  const y = date.getUTCFullYear(), m = date.getUTCMonth();
+  const boundary = month => new Date(Date.UTC(y, month, Math.min(salaryDay, new Date(Date.UTC(y, month + 1, 0)).getUTCDate())));
+  const month = date >= boundary(m) ? m : m - 1;
+  return { start: boundary(month), end: boundary(month + 1), payDate: boundary(month + 1) };
+}
+function centerPeriod(center, day) {
+  const schedule = center.salarySchedule || [];
+  const active = schedule.filter(rule => rule.from <= day).at(-1);
+  const period = salaryPeriod(active?.day || center.salaryDay || 31, day);
+  if (active && new Date(active.from) > period.start) period.start = new Date(active.from);
+  const next = schedule.find(rule => rule.from > day);
+  if (next && new Date(next.from) < period.end) period.end = period.payDate = new Date(next.from);
+  return period;
+}
 async function standaloneEarnings(req) {
+  const zone = safeTimeZone(req.center?.timezone || req.teacherWorkspace?.timezone);
+  const today = localDateStr(new Date(), zone);
   const centers = await list(teacherModeModels(req.db).ManagedCenter.find());
   const filter = { status: 'completed', managedCenterId: { $exists: true }, 'standalonePay.currency': { $exists: true } };
   const totalsPipeline = [{ $match: filter }, { $group: { _id: { center: '$managedCenterId', currency: '$standalonePay.currency', month: { $dateToString: { format: '%Y-%m', date: { $ifNull: ['$completedAt', '$scheduledTime'] }, timezone: 'UTC' } } }, earned: { $sum: '$standalonePay.amountMinor' }, lessons: { $sum: 1 } } }];
-  const receiptsPipeline = [{ $group: { _id: { center: '$centerId', currency: '$currency' }, received: { $sum: '$amountMinor' } } }];
+  const receiptsPipeline = [{ $group: { _id: { center: '$centerId', currency: '$currency', day: { $dateToString: { format: '%Y-%m-%d', date: '$receivedAt', timezone: zone } } }, received: { $sum: '$amountMinor' } } }];
   const Receipt = teacherModeModels(req.db).TeacherReceipt;
-  const dayPipeline = [{ $match: filter }, { $group: { _id: { center: '$managedCenterId', currency: '$standalonePay.currency', day: { $dateToString: { format: '%Y-%m-%d', date: { $ifNull: ['$completedAt', '$scheduledTime'] }, timezone: 'UTC' } } }, earned: { $sum: '$standalonePay.amountMinor' }, lessons: { $sum: 1 } } }];
+  const dayPipeline = [{ $match: filter }, { $group: { _id: { center: '$managedCenterId', currency: '$standalonePay.currency', month: { $dateToString: { format: '%Y-%m', date: { $ifNull: ['$completedAt', '$scheduledTime'] }, timezone: 'UTC' } }, day: { $dateToString: { format: '%Y-%m-%d', date: { $ifNull: ['$completedAt', '$scheduledTime'] }, timezone: zone } } }, earned: { $sum: '$standalonePay.amountMinor' }, lessons: { $sum: 1 } } }];
   const [bookingTotals, groupTotals, receiptTotals, versions, bookingDays, groupDays] = await Promise.all([Booking(req).aggregate(totalsPipeline), Group(req).aggregate(totalsPipeline), Receipt.aggregate(receiptsPipeline), model(req.db, 'TeacherChargeVersion', teacherChargeVersionSchema).find().sort({ effectiveAt: 1, _id: 1 }).lean(), Booking(req).aggregate(dayPipeline), Group(req).aggregate(dayPipeline)]);
   return centers.map(c => {
     const rows = [...bookingTotals, ...groupTotals, ...receiptTotals].filter(r => String(r._id.center) === String(c._id));
-    const period = salaryPeriod(c.salaryDay || 31);
-    return { ...c, salaryPeriod: { start: period.start, end: new Date(+period.end - 1), payDate: period.payDate }, totals: [...new Set([c.currency, ...rows.map(r => r._id.currency)])].map(currency => {
+    const period = centerPeriod(c, today);
+    const periods = new Map();
+    function ledger(day, currency) {
+      const { start, end } = centerPeriod(c, day);
+      const key = start.toISOString() + currency;
+      if (!periods.has(key)) periods.set(key, { start, end: new Date(+end - 1), currency, lessons: 0, earned: 0, received: 0, chargesTotal: 0, charges: [] });
+      return periods.get(key);
+    }
+    const daily = [...bookingDays, ...groupDays].filter(r => String(r._id.center) === String(c._id)).sort((a,b) => a._id.day.localeCompare(b._id.day));
+    const monthProgress = new Map();
+    for (const row of daily) {
+      const { currency, month, day } = row._id;
+      const entry = ledger(day, currency);
+      entry.earned += row.earned;
+      entry.lessons += row.lessons;
+      const key = month + currency;
+      if (!monthProgress.has(key)) {
+        const monthly = rows.filter(r => r._id.currency === currency && r._id.month === month);
+        const gross = monthly.reduce((n,r) => n + r.earned, 0);
+        monthProgress.set(key, { gross, weight: gross || monthly.reduce((n,r) => n + r.lessons, 0), used: 0, rules: monthlyCharges(versions,c._id,currency,month,gross) });
+      }
+      const progress = monthProgress.get(key);
+      const weight = progress.gross ? row.earned : row.lessons;
+      for (const [index, rule] of progress.rules.entries()) {
+        const share = Math.round(rule.amountMinor * (progress.used + weight) / progress.weight) - Math.round(rule.amountMinor * progress.used / progress.weight);
+        let charge = entry.charges.find(v => v.month === month && v.index === index);
+        if (!charge) { charge = { ...rule, index, amountMinor: 0 }; entry.charges.push(charge); }
+        charge.amountMinor += share;
+        entry.chargesTotal += share;
+      }
+      progress.used += weight;
+    }
+    for (const r of rows.filter(r => r.received !== undefined)) {
+      const { day, currency } = r._id;
+      // A payment on the opening payday settles the period that just ended.
+      const previousDay = new Date(Date.parse(day) - 86400000).toISOString().slice(0, 10);
+      const closingPayday = centerPeriod(c, previousDay).end.toISOString().slice(0, 10);
+      ledger(day === closingPayday ? previousDay : day, currency).received += r.received;
+    }
+    for (const currency of new Set([c.currency, ...rows.map(r => r._id.currency)])) ledger(today, currency);
+    for (const entry of periods.values()) {
+      entry.net = entry.earned - entry.chargesTotal;
+      entry.outstanding = entry.net - entry.received;
+    }
+    const entries = [...periods.values()];
+    const currentTotals = entries.filter(e => +e.start === +period.start);
+    const periodHistory = entries.filter(e => e.end < period.start).sort((a,b) => b.start - a.start);
+    return { ...c, currentTotals, periodHistory, salaryPeriod: { timezone: zone, start: period.start, end: new Date(+period.end - 1), payDate: period.payDate }, totals: [...new Set([c.currency, ...rows.map(r => r._id.currency)])].map(currency => {
       const matching = rows.filter(r => r._id.currency === currency);
       const earned = matching.reduce((n, r) => n + (r.earned || 0), 0), received = matching.reduce((n, r) => n + (r.received || 0), 0);
       const months = [...new Set(matching.map(r => r._id.month).filter(Boolean))];

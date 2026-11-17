@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import TeacherModeLogin from './TeacherModeLogin';
 import client from './client';
@@ -12,7 +12,10 @@ vi.mock('../../components/TermsModal', () => ({ AccountTerms: () => null }));
 beforeEach(() => vi.clearAllMocks());
 it('checks confirmation before saving and toggles each field independently', async () => {
   client.post.mockResolvedValue({ data: {} });
-  render(<MemoryRouter><TeacherModeLogin mode="setup" /></MemoryRouter>);
+  render(<MemoryRouter initialEntries={['/teacher-mode/setup/invite']}><Routes>
+    <Route path="/teacher-mode/setup/:token" element={<TeacherModeLogin mode="setup" />} />
+    <Route path="/teacher-mode/login" element={<TeacherModeLogin />} />
+  </Routes></MemoryRouter>);
   const password = screen.getByLabelText('Password'), confirm = screen.getByLabelText('Confirm password');
   fireEvent.change(password, { target: { value: 'Example@1234' } });
   fireEvent.change(confirm, { target: { value: 'Different@1234' } });
@@ -30,7 +33,7 @@ it('checks confirmation before saving and toggles each field independently', asy
   expect(client.post).not.toHaveBeenCalled();
   fireEvent.change(confirm, { target: { value: 'Example@1234' } });
   fireEvent.submit(password.closest('form'));
-  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Saved.'));
+  await screen.findByRole('button', { name: 'Open my workspace' });
   expect(client.post).toHaveBeenCalledTimes(1);
   expect(password).toHaveValue('');
   expect(confirm).toHaveValue('');

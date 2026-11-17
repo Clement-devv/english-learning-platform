@@ -10,6 +10,7 @@ export const managedCenterSchema = new mongoose.Schema({
   name: { type: String, required: true, maxlength: 120 },
   currency: { type: String, default: 'USD', match: /^[A-Z]{3}$/ },
   payBasis: { type: String, enum: ['class', 'hour'], default: 'class' },
+  salarySchedule: [{ _id: false, from: String, day: Number }],
   salaryDay: { type: Number, min: 1, max: 31, default: 31 },
   rateMinor: { type: Number, default: 0, min: 0 },
   prepaid: { type: Boolean, default: false },
