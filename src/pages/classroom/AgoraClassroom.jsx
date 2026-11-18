@@ -1,3 +1,6 @@
+import NextClassButton from './NextClassButton';
+import { useContext } from 'react';
+import { LiveStudioNavigation } from './LiveStudioFrame';
 import { teacherModeKey, classroomDashboardPath } from '../../utils/teacherMode';
 import StandaloneClassOutcome from '../teacher-mode/StandaloneClassOutcome';
 // AgoraClassroom.jsx
@@ -182,7 +185,9 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
   }, [sessionVideoProvider, userRole]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Minimize helper — go back to dashboard without ending the session
+  const openStudioDashboard = useContext(LiveStudioNavigation);
   const handleMinimize = () => {
+    if (openStudioDashboard) { openStudioDashboard(); return; }
     sessionStorage.setItem("activeClass", JSON.stringify({
       bookingId,
       classData,
@@ -244,6 +249,7 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 ${dm ? "bg-gray-900" : "bg-gradient-to-br from-purple-50 to-blue-50"}`}>
         <div className={`rounded-3xl shadow-2xl p-10 max-w-md w-full text-center ${dm ? "bg-gray-800" : "bg-white"}`}>
+          {!autoCompleting && <div className="flex justify-center mb-4"><NextClassButton /></div>}
           {autoCompleting ? (
             <>
               <div className="w-20 h-20 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
@@ -401,16 +407,17 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
           <button onClick={handleMinimize}
             title="Back to dashboard (class stays active)"
             className={`flex-shrink-0 inline-flex items-center justify-center transition-all duration-150 active:scale-95 ${
-              isMobile
+              isMobile && !openStudioDashboard
                 ? `w-9 h-9 rounded-xl ${dm ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`
                 : `gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${dm ? "border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-200 hover:border-gray-600" : "border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700"}`
             }`}>
             <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
             </svg>
-            {!isMobile && "Dashboard"}
+            {openStudioDashboard ? "Back to dashboard" : !isMobile && "Dashboard"}
           </button>
 
+          <NextClassButton />
           {/* Title */}
           <div className="flex-1 min-w-0">
             <h1 className={`font-semibold leading-tight truncate ${isMobile ? "text-sm" : "text-base"} ${dm ? "text-gray-100" : "text-gray-900"}`}>

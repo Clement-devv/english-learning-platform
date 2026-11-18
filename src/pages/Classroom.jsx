@@ -1,4 +1,5 @@
-import { classroomDashboardPath } from '../utils/teacherMode';
+import LiveStudioFrame from './classroom/LiveStudioFrame';
+import { classroomDashboardPath, teacherModeKey } from '../utils/teacherMode';
 // Classroom.jsx — Platform selector / router
 //
 // Responsibilities:
@@ -27,7 +28,13 @@ const GoogleMeetClassroom  = lazy(() => import("./classroom/GoogleMeetClassroom"
 const ZoomClassroom        = lazy(() => import("./classroom/ZoomClassroom"));
 const GroupAgoraClassroom  = lazy(() => import("./classroom/GroupAgoraClassroom"));
 
-export default function Classroom({ classData, userRole: propUserRole, onLeave, teacherGoogleMeetLink }) {
+export default function Classroom(props) {
+  const location = useLocation();
+  const data = props.classData || location.state?.classData;
+  return <ClassroomSession key={data?.bookingId || data?._id || data?.id || 'restored'} {...props} />;
+}
+
+function ClassroomSession({ classData, userRole: propUserRole, onLeave, teacherGoogleMeetLink }) {
   const navigate    = useNavigate();
   const location    = useLocation();
   const stateData   = location.state || {};
@@ -139,18 +146,27 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
   // ── Ensure the session document exists before teacher picks a platform ────
   useEffect(() => {
     if (isGroupClass || !bookingId) return;
+    let cancelled = false, retry;
     const join = async () => {
       try {
         await api.post("/classroom/attendance", {
           bookingId, userRole, action: "join", timestamp: new Date().toISOString(),
         });
+        if (cancelled) return;
+        const inherited = stateData.handoffProvider;
+        if (userRole === 'teacher' && teacherModeKey() && ['agora', 'googlemeet', 'zoom'].includes(inherited)) {
+          const { data } = await api.get('/classroom/session/' + bookingId);
+          if (!data?.session?.videoProvider) await api.patch('/classroom/session/' + bookingId + '/video-provider', { videoProvider: inherited });
+          if (!cancelled) setActiveVideoProvider(data?.session?.videoProvider || inherited);
+        }
         joinConfirmedRef.current = true;
         console.log("[classroom-selector] session created / confirmed");
       } catch (_) {
-        setTimeout(join, 2000);
+        if (!cancelled) retry = setTimeout(join, 2000);
       }
     };
     join();
+    return () => { cancelled = true; clearTimeout(retry); };
   }, [bookingId, userRole]);
 
   // ── Student: poll for teacher's platform choice ───────────────────────────
@@ -215,20 +231,20 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
   // ── Group class: go directly to GroupAgoraClassroom, no platform selection ─
   if (isGroupClass) {
     return (
-      <Suspense fallback={<ClassroomLoader label="Loading group class…" />}>
+      <LiveStudioFrame enabled={userRole === "teacher" && !!teacherModeKey()} bookingId={bookingId} provider={isGroupClass ? "agora" : activeVideoProvider}><Suspense fallback={<ClassroomLoader label="Loading group class…" />}>
         <GroupAgoraClassroom
           classData={finalClassData}
           userRole={userRole}
           onLeave={onLeave}
         />
-      </Suspense>
+      </Suspense></LiveStudioFrame>
     );
   }
 
   // ── Route to the chosen classroom ─────────────────────────────────────────
   if (activeVideoProvider === "agora") {
     return (
-      <Suspense fallback={<ClassroomLoader label="Loading Agora video…" />}>
+      <LiveStudioFrame enabled={userRole === "teacher" && !!teacherModeKey()} bookingId={bookingId}><Suspense fallback={<ClassroomLoader label="Loading Agora video…" />}>
         <AgoraClassroom
           classData={finalClassData}
           userRole={userRole}
@@ -236,13 +252,13 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
           managedStudent={managedStudent}
           googleMeetLink={resolvedMeetLink}
         />
-      </Suspense>
+      </Suspense></LiveStudioFrame>
     );
   }
 
   if (activeVideoProvider === "googlemeet") {
     return (
-      <Suspense fallback={<ClassroomLoader label="Loading classroom…" />}>
+      <LiveStudioFrame enabled={userRole === "teacher" && !!teacherModeKey()} bookingId={bookingId}><Suspense fallback={<ClassroomLoader label="Loading classroom…" />}>
         <GoogleMeetClassroom
           classData={finalClassData}
           userRole={userRole}
@@ -250,13 +266,13 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
           managedStudent={managedStudent}
           googleMeetLink={resolvedMeetLink}
         />
-      </Suspense>
+      </Suspense></LiveStudioFrame>
     );
   }
 
   if (activeVideoProvider === "zoom") {
     return (
-      <Suspense fallback={<ClassroomLoader label="Loading Zoom classroom…" />}>
+      <LiveStudioFrame enabled={userRole === "teacher" && !!teacherModeKey()} bookingId={bookingId}><Suspense fallback={<ClassroomLoader label="Loading Zoom classroom…" />}>
         <ZoomClassroom
           classData={finalClassData}
           userRole={userRole}
@@ -264,7 +280,7 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
           managedStudent={managedStudent}
           zoomLink={resolvedZoomLink}
         />
-      </Suspense>
+      </Suspense></LiveStudioFrame>
     );
   }
 
@@ -486,7 +502,7 @@ const FLOATERS = [
 ];
 
 function WaitingForTeacher() {
-  const [tipIdx, setTipIdx] = useState(0);
+  const [tipIdx, setTipIdx] = useState(0);
   useEffect(() => {
     const tipTimer = setInterval(() => setTipIdx(i => (i + 1) % TIPS.length), 4000);    return () => clearInterval(tipTimer);
   }, []);

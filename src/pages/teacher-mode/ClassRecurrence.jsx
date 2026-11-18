@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
 export function useClassRecurrence() {
   const [weekly, setWeekly] = useState(false);
@@ -19,10 +19,15 @@ export function useClassRecurrence() {
 }
 
 export default function ClassRecurrence({ recurrence: r, start }) {
+  const labelId = useId();
   const first = new Date(start);
   const when = Number.isFinite(+first) ? first.toLocaleString(undefined, { weekday: 'long', hour: 'numeric', minute: '2-digit' }) : '';
   return <div>
-    <label><input type="checkbox" checked={r.weekly} onChange={e => r.setWeekly(e.target.checked)} /> Repeat weekly{when && ' · ' + when}</label>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0', fontSize: 12 }}>
+      <input type="checkbox" aria-labelledby={labelId} checked={r.weekly} onChange={e => r.setWeekly(e.target.checked)}
+        style={{ width: 18, height: 18, minHeight: 18, padding: 0, margin: 0, flexShrink: 0, cursor: 'pointer' }} />
+      <span id={labelId}>Repeat weekly{when && ' · ' + when}</span>
+    </div>
     {r.weekly && <label>Weeks including the first class <select value={r.weeks} onChange={e => r.setWeeks(Number(e.target.value))}>
       {[2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n} weeks · {n} classes</option>)}
     </select></label>}

@@ -1,3 +1,5 @@
+import NextClassButton from './NextClassButton';
+import { StudioDashboardButton } from './LiveStudioFrame';
 import { teacherModeKey, classroomDashboardPath } from '../../utils/teacherMode';
 import StandaloneClassOutcome from '../teacher-mode/StandaloneClassOutcome';
 // ZoomClassroom.jsx
@@ -101,6 +103,7 @@ export default function ZoomClassroom({ classData, userRole, onLeave, zoomLink, 
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-rose-50 to-fuchsia-50 p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-md w-full text-center">
+          {!autoCompleting && <div className="flex justify-center mb-4"><NextClassButton /></div>}
           {autoCompleting ? (
             <>
               <div className="w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
@@ -255,6 +258,7 @@ export default function ZoomClassroom({ classData, userRole, onLeave, zoomLink, 
       {/* ── TOP BAR: title · status · timer · who's here ── */}
       <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-3">
         <div className="min-w-0 flex items-center gap-3">
+          <StudioDashboardButton />
           <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-pink-400 to-rose-500 flex items-center justify-center text-lg shadow-md shadow-pink-300/50 flex-shrink-0">
             🎀
           </div>

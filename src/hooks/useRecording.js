@@ -1,4 +1,6 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { ClassHandoffContext } from '../pages/classroom/ClassHandoffContext';
+import { offerRecordingHandoff, takeRecordingHandoff } from '../utils/recordingHandoff';
+import { useState, useRef, useCallback, useEffect, useContext } from "react";
 import { useUploadQueue } from "../context/UploadQueueContext.jsx";
 
 // A long class is saved as consecutive parts of this length. Each part is a
@@ -32,6 +34,8 @@ export function useRecording(bookingId, { captureThisTab = false } = {}) {
   const hasActiveUploadsRef = useRef(false);
   useEffect(() => { hasActiveUploadsRef.current = hasActiveUploads; }, [hasActiveUploads]);
 
+  const handoff = useContext(ClassHandoffContext);
+  const savedParts = useRef([]);
   const pendingStart = useRef(null);
   const mediaRecorderRef = useRef(null);   // recorder for the current part
   const recordStreamRef  = useRef(null);   // tab video + mixed audio, shared by all parts
@@ -63,7 +67,7 @@ export function useRecording(bookingId, { captureThisTab = false } = {}) {
     if (!bookingId) {
       console.warn("[useRecording] dropped — bookingId missing", { blobSize: blob.size });
       setRecordingError("Recording not saved: class ID missing. Please leave and rejoin.");
-      return;
+      return false;
     }
     if (blob.size < 1000) {
       console.warn("[useRecording] dropped — blob too small", { blobSize: blob.size, part: part.partNumber });
@@ -72,13 +76,14 @@ export function useRecording(bookingId, { captureThisTab = false } = {}) {
       if (part.partNumber === 1) {
         setRecordingError("Recording not saved: no video data captured. Select the correct tab when prompted.");
       }
-      return;
+      return part.partNumber !== 1;
     }
 
     const ext = blobType.includes("mp4") ? ".mp4" : ".webm";
     // Hand off to the global queue — upload runs in background regardless of
     // which page the teacher navigates to next.
-    addToQueue(blob, bookingId, part.duration, ext, part);
+    const saved = new Promise(resolve => addToQueue(blob, bookingId, part.duration, ext, { ...part, onStored: resolve }));
+    return saved;
   }, [bookingId, addToQueue]);
 
   // Start recording the next part on the shared stream. Returns the recorder.
@@ -97,20 +102,24 @@ export function useRecording(bookingId, { captureThisTab = false } = {}) {
       audioBitsPerSecond: 128_000,
     });
 
+    let resolveSaved;
+    recorder.saved = new Promise(resolve => { resolveSaved = resolve; });
     recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
     recorder.onstop = () => {
-      handlePartStop(chunks, {
+      const saved = handlePartStop(chunks, {
         sessionId:   session.id,
         partNumber,
         startOffset: Math.round((partStarted - session.startedAt) / 1000),
         duration:    Math.round((Date.now() - partStarted) / 1000),
       });
+      Promise.resolve(saved).then(value => resolveSaved(value !== false));
       if (mediaRecorderRef.current === recorder) {
         stopRecordingRef.current();
         setRecordingError("Recording stopped unexpectedly. Check screen sharing and restart recording.");
       }
     };
     recorder.start(1000);
+    savedParts.current.push(recorder.saved);
     session.nextPart += 1;
     mediaRecorderRef.current = recorder;
     return recorder;
@@ -260,6 +269,66 @@ export function useRecording(bookingId, { captureThisTab = false } = {}) {
       releaseStreams();
     }
   }, [releaseStreams]);
+
+  const startExistingCapture = useCallback((capture) => {
+    tabStreamRef.current = capture.tabStream;
+    micStreamRef.current = capture.micStream;
+    audioCtxRef.current = capture.audioContext;
+    recordStreamRef.current = capture.recordStream;
+    mimeTypeRef.current = capture.mimeType;
+    try {
+      if (capture.tabStream.getVideoTracks()[0]?.readyState !== 'live') throw new Error('Screen sharing ended. Select the meeting tab again.');
+      sessionRef.current = { id: newSessionId(), startedAt: Date.now(), nextPart: 1 };
+      startPart(); schedulePartRotation();
+      capture.tabStream.getVideoTracks()[0].onended = () => stopRecordingRef.current();
+      setRecSeconds(0); setIsRecording(true);
+      recTimerRef.current = setInterval(() => setRecSeconds(n => n + 1), 1000);
+    } catch (error) {
+      releaseStreams(); setRecordingError(error.message);
+    }
+  }, [startPart, schedulePartRotation, releaseStreams]);
+
+  const prepareHandoff = useCallback(async (nextBookingId, keepCapture) => {
+    if (keepCapture && !recordStreamRef.current) throw new Error('Screen sharing has ended. Uncheck Keep shared tab, then select a recording tab in the next class.');
+    if (pendingStart.current) throw new Error('Finish selecting the recording tab before switching classes.');
+    clearInterval(recTimerRef.current); clearTimeout(partTimerRef.current);
+    const recorder = mediaRecorderRef.current;
+    mediaRecorderRef.current = null;
+    setIsRecording(false);
+    if (recorder?.state === 'recording') {
+      await new Promise(resolve => { recorder.addEventListener('stop', resolve, { once: true }); recorder.stop(); });
+      await recorder.saved;
+    }
+    const stored = await Promise.all(savedParts.current);
+    if (stored.some(value => value === false)) {
+      releaseStreams();
+      throw new Error('The recording could not be saved locally. Stay on this page until its upload finishes; do not close or refresh.');
+    }
+    if (keepCapture && recordStreamRef.current && tabStreamRef.current?.getVideoTracks()[0]?.readyState === 'live') {
+      const capture = { tabStream: tabStreamRef.current, micStream: micStreamRef.current,
+        audioContext: audioCtxRef.current, recordStream: recordStreamRef.current, mimeType: mimeTypeRef.current };
+      capture.tabStream.getVideoTracks()[0].onended = null;
+      offerRecordingHandoff(nextBookingId, capture);
+      tabStreamRef.current = micStreamRef.current = audioCtxRef.current = recordStreamRef.current = null;
+    } else releaseStreams();
+    sessionRef.current = null;
+  }, [releaseStreams]);
+
+  useEffect(() => {
+    if (!handoff) return;
+    const control = { prepareHandoff };
+    handoff.recorder.current = control;
+    // Keep the finalization handle until the frame leaves, including when the video UI unmounts at completion.
+  }, [handoff, prepareHandoff]);
+
+  useEffect(() => {
+    // Defer adoption so StrictMode's rehearsal cleanup cannot consume the capture.
+    const timer = setTimeout(() => {
+      const capture = takeRecordingHandoff(bookingId);
+      if (capture) startExistingCapture(capture);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [bookingId, startExistingCapture]);
 
   useEffect(() => { stopRecordingRef.current = stopRecording; }, [stopRecording]);
 

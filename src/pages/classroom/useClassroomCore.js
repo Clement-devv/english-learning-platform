@@ -1,3 +1,4 @@
+import { ClassHandoffContext } from './ClassHandoffContext';
 // useClassroomCore.js
 // Shared attendance + timer logic for both Agora and Google Meet classrooms.
 //
@@ -9,12 +10,14 @@
 //   - bothActiveStartRef is anchored to classStartedAt on fresh sessions so background-throttled
 //     tabs (Google Meet open in another tab) still compute correct elapsed time.
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useContext } from "react";
 import api from "../../api";
 
 // managedStudent: the student has no login (managed account) — the teacher confirms
 // their presence with setManagedStudentPresence() instead of the student joining.
 export function useClassroomCore({ bookingId, userRole, duration, managedStudent = false }) {
+
+  const handoff = useContext(ClassHandoffContext);
 
   // ── Presence ──────────────────────────────────────────────────────────────
   const [isTeacherPresent, setIsTeacherPresent] = useState(userRole === "teacher");
@@ -397,6 +400,31 @@ export function useClassroomCore({ bookingId, userRole, duration, managedStudent
     sendHeartbeat();
     setTimeout(() => window.location.reload(), 300);
   }, [bookingId, getCurrentBothActive, sendHeartbeat]);
+
+  // The handover must await the server outcome, without replacing the recorder UI
+  // with a completion screen while its shared capture is being transferred.
+  useEffect(() => {
+    if (!handoff || userRole !== 'teacher') return;
+    const finish = async () => {
+      if (!joinConfirmedRef.current) throw new Error('The classroom is still connecting. Please try again.');
+      const activeTime = getCurrentBothActive();
+      const wasCompleting = hasAutoCompletedRef.current;
+      hasAutoCompletedRef.current = true;
+      try {
+        await api.post('/classroom/attendance', { bookingId, userRole, action: 'leave', timestamp: new Date().toISOString(), activeTime });
+        const { data } = await api.post('/classroom/auto-complete', { bookingId, clientBothActiveTime: activeTime, callerRole: userRole });
+        if (data?.completed !== true && data?.missed !== true) throw new Error('The class outcome was not saved. Please retry.');
+        clearInterval(timerRef.current); clearInterval(syncRef.current);
+        sessionStorage.removeItem('classroom_refresh_' + bookingId);
+        return data;
+      } catch (error) {
+        hasAutoCompletedRef.current = wasCompleting;
+        throw error;
+      }
+    };
+    handoff.finishClass.current = finish;
+    return () => { if (handoff.finishClass.current === finish) handoff.finishClass.current = null; };
+  }, [handoff, bookingId, userRole, getCurrentBothActive]);
 
   // ── handleLeaveEarly ───────────────────────────────────────────────────────
   const handleLeaveEarly = useCallback(async () => {

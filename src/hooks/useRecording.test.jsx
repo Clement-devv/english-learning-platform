@@ -40,3 +40,49 @@ it('continues capturing the next part while the previous upload is pending and f
     expect(video.stop).toHaveBeenCalledOnce();
   } finally { unmount(); delete navigator.mediaDevices; }
 });
+
+it('files the old recording before transferring capture and starts a separate session for the next class', async () => {
+  const video = { readyState: 'live', stop: vi.fn() };
+  const stream = { getVideoTracks: () => [video], getAudioTracks: () => [], getTracks: () => [video] };
+  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: {
+    getDisplayMedia: vi.fn().mockResolvedValue(stream), getUserMedia: vi.fn().mockRejectedValue(new Error('No mic'))
+  } });
+  vi.stubGlobal('MediaStream', class {});
+  vi.stubGlobal('AudioContext', class {
+    createMediaStreamDestination() { return { stream }; }
+    close() { return Promise.resolve(); }
+  });
+  vi.stubGlobal('MediaRecorder', class extends EventTarget {
+    static isTypeSupported(type) { return type === 'video/webm'; }
+    start() { this.state = 'recording'; }
+    stop() {
+      this.state = 'inactive';
+      this.ondataavailable({ data: new Blob(['x'.repeat(2000)]) });
+      this.onstop(); this.dispatchEvent(new Event('stop'));
+    }
+  });
+  const { ClassHandoffContext } = await import('../pages/classroom/ClassHandoffContext');
+  const handoff = { recorder: { current: null } };
+  const wrapper = ({ children }) => <ClassHandoffContext.Provider value={handoff}>{children}</ClassHandoffContext.Provider>;
+  const first = renderHook(() => useRecording('first'), { wrapper });
+  let second;
+  try {
+    await act(async () => { await first.result.current.startRecording(); });
+    let transferred = false, transfer;
+    await act(async () => { transfer = handoff.recorder.current.prepareHandoff('second', true).then(() => { transferred = true; }); });
+    expect(transferred).toBe(false);
+    expect(queue.mock.calls[0][1]).toBe('first');
+    expect(video.stop).not.toHaveBeenCalled();
+    await act(async () => { queue.mock.calls[0][4].onStored(true); await transfer; });
+    first.unmount();
+    second = renderHook(() => useRecording('second'));
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+    expect(second.result.current.isRecording).toBe(true);
+    expect(navigator.mediaDevices.getDisplayMedia).toHaveBeenCalledTimes(1);
+    act(() => second.result.current.stopRecording());
+    expect(queue.mock.calls[1][1]).toBe('second');
+    expect(queue.mock.calls[1][4].partNumber).toBe(1);
+    expect(queue.mock.calls[1][4].sessionId).not.toBe(queue.mock.calls[0][4].sessionId);
+    expect(video.stop).toHaveBeenCalledTimes(1);
+  } finally { first.unmount(); second?.unmount(); delete navigator.mediaDevices; }
+});

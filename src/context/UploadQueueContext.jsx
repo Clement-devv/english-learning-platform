@@ -172,7 +172,8 @@ export function UploadQueueProvider({ children }) {
     };
     setQueueSync(prev => [...prev, item]);
     // Store locally first so a crash mid-upload can't lose the part
-    savePart(persistable(item)).then(() => {
+    savePart(persistable(item)).then((stored) => {
+      part.onStored?.(stored);
       // An earlier upload may finish while this blob is still being written.
       updateItem(id, { storagePending: false });
       pumpRef.current();

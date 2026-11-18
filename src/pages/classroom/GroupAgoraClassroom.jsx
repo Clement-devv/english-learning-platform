@@ -1,3 +1,4 @@
+import { StudioDashboardButton } from './LiveStudioFrame';
 // GroupAgoraClassroom.jsx — Agora "live" mode group class
 // Teacher = host (publishes audio + video)
 // Students = audience by default; promoted students switch to host role to speak
@@ -545,6 +546,7 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
         borderBottom: "1px solid rgba(255,255,255,0.08)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <StudioDashboardButton />
           <Users size={18} color="#6366f1" />
           <span style={{ color: "#e2e8f0", fontWeight: 700, fontSize: 15 }}>{classData.title || "Group Class"}</span>
           <span style={{ background: "#6366f120", color: "#818cf8", borderRadius: 8, padding: "2px 10px", fontSize: 12 }}>
