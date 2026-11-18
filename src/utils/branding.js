@@ -175,6 +175,9 @@ export const applyBranding = (branding, center) => {
     document.title = center.centerName;
   }
 
+  // Family links own their standalone icons while mounted.
+  if (document.querySelector('link[data-family-icon="true"]')) return;
+
   // 8. Favicon
   if (branding.favicon) {
     let favicon = document.querySelector("link[rel='icon']");

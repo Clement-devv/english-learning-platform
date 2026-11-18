@@ -1,6 +1,13 @@
 import { useLayoutEffect } from 'react';
 
-export function useStudioInstall() {
+export function useStudioInstall(dark = false) {
+  useLayoutEffect(() => {
+    const tag = document.querySelector('meta[name="theme-color"]');
+    if (!tag) return;
+    const previous = tag.content;
+    tag.content = dark ? '#20231e' : '#f3f0e8';
+    return () => { tag.content = previous; };
+  }, [dark]);
   useLayoutEffect(() => {
     const tags = [
       ['link[rel="manifest"]', 'href', '/ego-studio/manifest.webmanifest'],

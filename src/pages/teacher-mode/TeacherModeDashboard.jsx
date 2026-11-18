@@ -1,10 +1,11 @@
+import { useUploadQueue } from '../../context/UploadQueueContext';
 import { useStudioInstall } from './useStudioInstall';
 import StudioLanguageSwitch from './StudioLanguageSwitch';
 import { useStudioLanguage } from './useStudioLanguage';
 import { studioText } from './studioLanguage';
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, lazy, Suspense } from 'react';
 import { useNavigate, useLocation, useNavigationType } from 'react-router-dom';
-import { BookOpen, Building2, Users, CalendarDays, Link2, Wallet, MessageCircle, LogOut, SunMoon, ArrowUpRight, GraduationCap, Video, Gamepad2, ListChecks, ShieldCheck } from 'lucide-react';
+import { BookOpen, Building2, Users, CalendarDays, Link2, Wallet, MessageCircle, LogOut, SunMoon, ArrowUpRight, GraduationCap, Video, Gamepad2, ListChecks, RefreshCw, ShieldCheck } from 'lucide-react';
 import api from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { teacherModeKey, studioClassroomState } from '../../utils/teacherMode';
@@ -59,12 +60,14 @@ const tabs = [
 ];
 
 export default function TeacherModeDashboard() {
-  useStudioInstall();
+
   useStudioLanguage('teacher');
   const auth = useAuth(), navigate = useNavigate(), location = useLocation();
   const [showSessions, setShowSessions] = useState(false), [showPassword, setShowPassword] = useState(false);
   const [dark, setDark] = useState(() => localStorage.getItem('teacherModeDark') === 'true');
   const navigationType = useNavigationType();
+  useStudioInstall(dark);
+  const { hasActiveUploads } = useUploadQueue();
   const [tab, setTab] = useState(() => {
     const navigation = window.performance.getEntriesByType?.('navigation')[0];
     if (navigationType === 'POP' && navigation?.type === 'reload') return 'overview';
@@ -153,7 +156,7 @@ export default function TeacherModeDashboard() {
       <button className="tm-account" onClick={() => switchTab('profile')}><span className="tm-avatar">{teacherInfo.firstName?.slice(0, 1) || 'T'}</span><span><strong>{[teacherInfo.firstName, teacherInfo.lastName].filter(Boolean).join(' ') || 'My account'}</strong><small>Independent teacher</small></span><ArrowUpRight size={15} /></button></div>
     </aside>
     <section className="tm-main" id="teacher-workspace-content" tabIndex={-1}>
-      <header className="tm-header"><div><span className="tm-eyebrow">YOUR SPACE TO MAKE A DIFFERENCE</span><h1>{tab === 'overview' ? studioText('The teacher studio') : studioText(tabs.find(t => t[0] === tab)?.[1])}</h1></div><div className="tm-header-controls"><span className="tm-header-date">{new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())}</span>{!['students', 'parent-links'].includes(tab) && <label><span>{studioText("Workspace view")}</span><select value={centerId} onChange={e => setCenterId(e.target.value)}><option value="">{studioText("All centers")}</option>{centers.map(c => <option key={c._id} value={c._id}>{c.name}{c.archived ? ' · archived' : ''}</option>)}</select></label>}</div></header>
+      <header className="tm-header"><div><span className="tm-eyebrow">YOUR SPACE TO MAKE A DIFFERENCE</span><h1>{tab === 'overview' ? studioText('The teacher studio') : studioText(tabs.find(t => t[0] === tab)?.[1])}</h1></div><div className="tm-header-controls"><button type="button" disabled={busy || hasActiveUploads} title={hasActiveUploads ? "Wait for recording uploads to finish before refreshing." : undefined} onClick={() => window.location.reload()}><RefreshCw size={16} aria-hidden="true" />{studioText("Refresh page")}</button><span className="tm-header-date">{new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())}</span>{!['students', 'parent-links'].includes(tab) && <label><span>{studioText("Workspace view")}</span><select value={centerId} onChange={e => setCenterId(e.target.value)}><option value="">{studioText("All centers")}</option>{centers.map(c => <option key={c._id} value={c._id}>{c.name}{c.archived ? ' · archived' : ''}</option>)}</select></label>}</div></header>
       {error && <div role="alert" className="tm-notice tm-error">{error}</div>}{refreshError && <div role="alert" className="tm-notice tm-error">{refreshError} <button onClick={() => refresh({ failedOnly: true })}>Retry</button></div>}{notice && <p role="status" className="tm-notice">{notice}</p>}{loading ? <div className="tm-card" role="status">Loading your workspace…</div> : <Suspense fallback={<div className="tm-card" role="status">Loading tab…</div>}>
       {tab === 'overview' && <TeacherWorkspaceOverview teacher={teacherInfo} centers={centers} students={filteredStudents} work={filteredWork} messages={messages.filter(m => !centerId || filteredStudents.some(s => s._id === m.studentId))} onNavigate={switchTab} />}
       {tab === 'centers' && <CentersSection centers={centers} students={students} busy={busy} run={run} onViewStudents={id => switchTab('students', { centerId: id })} />}

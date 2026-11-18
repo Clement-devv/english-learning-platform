@@ -2,7 +2,7 @@ import ManualCompletionNotice from './ManualCompletionNotice';
 import StudioLanguageSwitch from './StudioLanguageSwitch';
 import { useStudioLanguage } from './useStudioLanguage';
 import { studioText } from './studioLanguage';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { BookOpen, MessageCircle, Moon, RefreshCw, Sun } from 'lucide-react';
@@ -15,6 +15,25 @@ import FamilyActivities from './FamilyActivities';
 
 export default function TeacherFamilyPage() {
   useStudioLanguage('family');
+  useLayoutEffect(() => {
+    // The family page shares the standalone logo, but not the teacher app's launch URL.
+    const restore = [];
+    for (const [rel, href] of [['icon', '/ego-studio/icon-64.png'], ['apple-touch-icon', '/ego-studio/icon-180.png']]) {
+      let tag = document.querySelector('link[rel="' + rel + '"]');
+      const created = !tag;
+      if (!tag) { tag = document.createElement('link'); tag.rel = rel; document.head.appendChild(tag); }
+      const previous = tag.getAttribute('href');
+      tag.setAttribute('href', href);
+      tag.dataset.familyIcon = 'true';
+      restore.push(() => {
+        delete tag.dataset.familyIcon;
+        if (created) tag.remove();
+        else if (previous == null) tag.removeAttribute('href');
+        else tag.setAttribute('href', previous);
+      });
+    }
+    return () => restore.forEach(reset => reset());
+  }, []);
   const { token } = useParams(), base = `${modeBase}/family/${token}`;
   const key = `teacher-family:${token}`;
   const [dark, setDark] = useState(() => { const saved = localStorage.getItem('teacherFamilyDark'); return saved == null ? localStorage.getItem('teacherModeDark') === 'true' : saved === 'true'; });
