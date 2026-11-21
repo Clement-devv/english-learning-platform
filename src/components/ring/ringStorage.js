@@ -151,3 +151,7 @@ export function clearCustomTone() {
 export function getCustomToneUrl() {
   return localStorage.getItem(URL_KEY) || null;
 }
+
+export function getCustomToneName() {
+  return localStorage.getItem(NAME_KEY) || null;
+}

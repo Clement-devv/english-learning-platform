@@ -1,3 +1,4 @@
+import { ClassReminderSettings } from './StandaloneClassReminder';
 import { useStudioTimezone } from './useStudioTimezone';
 import { useUploadQueue } from '../../context/UploadQueueContext';
 import { useStudioInstall } from './useStudioInstall';
@@ -79,6 +80,13 @@ export default function TeacherModeDashboard({ liveBookingId, onReturnToClass } 
     const shortcuts = { payment: 'earnings', 'completed-classes': 'completed-classes', 'class-summaries': 'class-summaries', classes: 'classes' };
     return shortcuts[state?.activeTab] || (new URLSearchParams(location.search).get('tab') === 'games' ? 'games' : 'overview');
   });
+  useEffect(() => {
+    const open = () => setTab('classes');
+    window.addEventListener('studio-open-classes', open);
+    if (new URLSearchParams(location.search).get('tab') === 'classes') open();
+    return () => window.removeEventListener('studio-open-classes', open);
+  }, [location.search]);
+  const reminderVersion = useRef('');
   const [centerId, setCenterId] = useState('');
   const [centers, setCenters] = useState([]), [students, setStudents] = useState([]), [work, setWork] = useState([]), [earnings, setEarnings] = useState([]), [messages, setMessages] = useState([]);
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
@@ -108,7 +116,16 @@ export default function TeacherModeDashboard({ liveBookingId, onReturnToClass } 
     const results = await Promise.allSettled(sections.map(async ([path, , update]) => {
       const params = path === '/messages' && ['parents', 'messages'].includes(tab) ? { read: true, family: tab === 'parents' } : undefined;
       const response = await api.get(path, { signal: controller.signal, params });
-      if (!controller.signal.aborted) update(response.data.data);
+      if (!controller.signal.aborted) {
+        update(response.data.data);
+        if (path === '/work') {
+          const version = JSON.stringify((response.data.data || []).map(item => [item._id, item.scheduledTime, item.status]));
+          if (reminderVersion.current !== version) {
+            reminderVersion.current = version;
+            window.dispatchEvent(new Event('studio-bookings-changed'));
+          }
+        }
+      }
     }));
     if (controller.signal.aborted) return;
     activeRefresh.current = null;
@@ -170,7 +187,7 @@ export default function TeacherModeDashboard({ liveBookingId, onReturnToClass } 
       {tab === 'completed-classes' && <TeacherClassHistory refreshKey={work} onChanged={refresh} teacherInfo={teacherInfo} centerId={centerId} centers={centers} onCenterChange={setCenterId} onNavigate={switchTab} />}
       {['class-summaries', 'availability'].includes(tab) && <Suspense fallback={<p role="status">Loading teaching tools…</p>}><div className="tm-tool">{tab === 'class-summaries' ? <ClassSummaries key={centerId} studio isDarkMode={dark} /> : <Schedule teacherInfo={teacherInfo} isDarkMode={dark} students={filteredStudents} studio />}</div></Suspense>}
       {tab === 'schedule' && <TeacherCalendar work={filteredWork} centers={centers} onLesson={() => switchTab('classes')} />}
-      {tab === 'profile' && <><StudioIntro eyebrow="THE PERSON BEHIND THE PROGRESS" title="Your profile. Your peace of mind.">Make this space yours, and keep your account secure.</StudioIntro><Suspense fallback={<div className="tm-card" role="status">Loading profile…</div>}><div className="tm-tool tm-tool-profile"><Profile studio teacherInfo={teacherInfo} isDarkMode={dark} onUpdate={user => auth.setUser(user)} /></div><section className="tm-card tm-security-settings"><div className="tm-form-heading"><span className="tm-round-icon"><ShieldCheck size={19} /></span><div><span className="tm-eyebrow">YOUR WORKSPACE, PROTECTED</span><h3>Account security</h3></div></div><div className="tm-security-actions"><div><strong>Password & devices</strong><p>Keep your password fresh and check where you’re signed in.</p></div><div className="tm-actions"><button onClick={() => setShowPassword(true)}>Change password</button><button onClick={() => setShowSessions(true)}>Manage devices</button></div></div><TwoFactorManagement userType="teacher" /></section><div className="tm-studio-dialogs">{showSessions && <SessionManagement isOpen onClose={() => setShowSessions(false)} />}{showPassword && <ChangePassword onClose={() => setShowPassword(false)} onSuccess={() => { auth.logout(); navigate('/teacher-mode/login', { replace: true }); }} />}</div></Suspense></>}
+      {tab === 'profile' && <><section className="tm-card"><h2>Class reminders</h2><ClassReminderSettings /></section><StudioIntro eyebrow="THE PERSON BEHIND THE PROGRESS" title="Your profile. Your peace of mind.">Make this space yours, and keep your account secure.</StudioIntro><Suspense fallback={<div className="tm-card" role="status">Loading profile…</div>}><div className="tm-tool tm-tool-profile"><Profile studio teacherInfo={teacherInfo} isDarkMode={dark} onUpdate={user => auth.setUser(user)} /></div><section className="tm-card tm-security-settings"><div className="tm-form-heading"><span className="tm-round-icon"><ShieldCheck size={19} /></span><div><span className="tm-eyebrow">YOUR WORKSPACE, PROTECTED</span><h3>Account security</h3></div></div><div className="tm-security-actions"><div><strong>Password & devices</strong><p>Keep your password fresh and check where you’re signed in.</p></div><div className="tm-actions"><button onClick={() => setShowPassword(true)}>Change password</button><button onClick={() => setShowSessions(true)}>Manage devices</button></div></div><TwoFactorManagement userType="teacher" /></section><div className="tm-studio-dialogs">{showSessions && <SessionManagement isOpen onClose={() => setShowSessions(false)} />}{showPassword && <ChangePassword onClose={() => setShowPassword(false)} onSuccess={() => { auth.logout(); navigate('/teacher-mode/login', { replace: true }); }} />}</div></Suspense></>}
       {tab === 'resources' && <TeacherResources centerId={centerId} archived={current?.archived} />}
       {['homework', 'quizzes', 'games', 'recordings', 'vocab'].includes(tab) && <><StudioIntro eyebrow={toolCopy[tab][0]} title={toolCopy[tab][1]}>{toolCopy[tab][2]}</StudioIntro><div className={`tm-tool tm-tool-${tab}`}><Suspense fallback={<div className="tm-card" role="status">Loading teaching tools…</div>}>{tab === 'homework' && <Homework key={centerId} {...props} />}{tab === 'quizzes' && <Quiz key={centerId} {...props} />}{tab === 'games' && <Games key={centerId} isDarkMode={dark} />}{tab === 'recordings' && <Recordings key={centerId} isDarkMode={dark} studio onVisibilityChange={refresh} />}{tab === 'vocab' && <Vocab key={centerId} {...props} />}</Suspense></div></>}
       {tab === 'earnings' && <EarningsSection earnings={earnings} onCenterChange={setCenterId} centerId={centerId} center={current} busy={busy} run={run} onNavigate={switchTab} />}

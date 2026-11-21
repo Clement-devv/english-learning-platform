@@ -20,7 +20,7 @@ import {
   isTipDue, markTipShown, setTipsEnabled,
 } from "../utils/pushNotifications";
 
-const DASHBOARD_PATHS = ["/student/dashboard", "/teacher/dashboard", "/admin", "/sub-admin/dashboard", "/parent/dashboard"];
+const DASHBOARD_PATHS = ["/teacher-mode/dashboard", "/student/dashboard", "/teacher/dashboard", "/admin", "/sub-admin/dashboard", "/parent/dashboard"];
 const isDashboard = (p) => DASHBOARD_PATHS.some(d => p.startsWith(d)) && !p.endsWith("/login");
 
 export default function DeviceNotificationPrompt() {
@@ -88,8 +88,8 @@ export default function DeviceNotificationPrompt() {
   return (
     <div role="dialog" aria-labelledby="dnp-title" className="dnp-card" style={{
       position: "fixed", left: 16, zIndex: 9985, width: `min(${isTip ? 340 : 360}px, calc(100vw - 32px))`,
-      background: isTip ? "#f8fafc" : "#fff", borderRadius: 18, boxShadow: "0 12px 40px rgba(15,23,42,0.22)",
-      border: `1px solid ${isTip ? "#cbd5e1" : "#e2e8f0"}`, padding: "14px 16px 12px",
+      background: isTip ? "#fffaf1" : "#fff", borderRadius: 18, boxShadow: "0 12px 40px rgba(67,45,27,0.18)",
+      border: `1px solid ${isTip ? "#f2c99f" : "#e8ded2"}`, padding: "14px 16px 12px",
       fontFamily: "'Inter', system-ui, sans-serif", animation: "dnp-in .25s ease",
     }}>
       <style>{`@keyframes dnp-in { from { opacity:0; transform: translateY(12px) } to { opacity:1; transform:none } }
@@ -108,14 +108,14 @@ export default function DeviceNotificationPrompt() {
           <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
             <div style={{
               width: isTip ? 30 : 38, height: isTip ? 30 : 38, borderRadius: isTip ? 10 : 12, flexShrink: 0,
-              background: isTip ? "#e0e7ff" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+              background: isTip ? "#fff0d9" : "linear-gradient(135deg,#ea580c,#f59e0b)",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              {isTip ? <Info size={16} color="#4f46e5" /> : <Bell size={18} color="#fff" />}
+              {isTip ? <Info size={16} color="#c2410c" /> : <Bell size={18} color="#fff" />}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               {isTip && (
-                <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "#4f46e5" }}>Tip</span>
+                <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "#c2410c" }}>Tip</span>
               )}
               <p id="dnp-title" style={{ margin: 0, fontSize: isTip ? 13.5 : 14.5, fontWeight: 800, color: "#0f172a" }}>
                 {mode === "ask"         && "Get notifications on this device?"}
@@ -141,17 +141,17 @@ export default function DeviceNotificationPrompt() {
             )}
             {mode === "blocked-tip" ? (
               <button onClick={later}
-                style={{ padding: "7px 14px", borderRadius: 10, border: "none", background: "#4f46e5", color: "#fff", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                style={{ padding: "7px 14px", borderRadius: 10, border: "none", background: "#c2410c", color: "#fff", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
                 Got it
               </button>
             ) : (
               <>
                 <button onClick={mode === "ask" ? notNow : later} disabled={busy}
-                  style={{ padding: "7px 14px", borderRadius: 10, border: "1px solid #e2e8f0", background: "#fff", color: "#334155", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                  style={{ padding: "7px 14px", borderRadius: 10, border: "1px solid #eadfd4", background: "#fff", color: "#514439", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
                   {mode === "ask" ? "Not now" : "Later"}
                 </button>
                 <button onClick={allow} disabled={busy}
-                  style={{ padding: "7px 16px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", opacity: busy ? 0.7 : 1 }}>
+                  style={{ padding: "7px 16px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#ea580c,#d97706)", color: "#fff", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", opacity: busy ? 0.7 : 1 }}>
                   {busy ? "Turning on…" : mode === "ask" ? "Allow" : "Turn on"}
                 </button>
               </>

@@ -1,3 +1,4 @@
+import StandaloneClassReminder from './pages/teacher-mode/StandaloneClassReminder';
 import React, { useState, useEffect, lazy, Suspense } from "react";
 import { BrandingProvider } from './context/BrandingContext.jsx';
 import { AuthProvider }     from './context/AuthContext.jsx';
@@ -209,6 +210,7 @@ function App() {
         <ImpersonationBanner />
         <ActiveClassBanner />
         <IncomingRingModal />
+        <StandaloneClassReminder />
         <MissedCallAlert />
         <MessageAlert />
         <SignedOutNotice />

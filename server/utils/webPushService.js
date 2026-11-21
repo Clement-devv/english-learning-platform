@@ -18,6 +18,7 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   logger.warn("⚠️  VAPID keys missing — web push notifications disabled");
 }
 
+export const PUSH_CONFIGURED = Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
 export const VAPID_PUB = VAPID_PUBLIC_KEY || null;
 
 // ── Push service allow-list ──────────────────────────────────────────────────
@@ -43,7 +44,7 @@ export function isPushServiceEndpoint(endpoint) {
  * subscription = { endpoint, keys: { p256dh, auth } }
  * payload      = { title, body, icon?, badge?, data? }
  */
-export async function sendPush(subscription, payload) {
+export async function sendPush(subscription, payload, { TTL, urgency, timeout, throwOnError = false } = {}) {
   if (!VAPID_PUBLIC_KEY || !subscription?.endpoint) return;
   // Also re-checked here: subscriptions saved before the allow-list existed
   // are never contacted, and the caller drops them as stale.
@@ -52,13 +53,14 @@ export async function sendPush(subscription, payload) {
     throw Object.assign(new Error("Untrusted push endpoint"), { stale: true });
   }
   try {
-    await webpush.sendNotification(subscription, JSON.stringify(payload));
+    await webpush.sendNotification(subscription, JSON.stringify(payload), { ...(TTL != null ? { TTL } : {}), ...(urgency ? { urgency } : {}), ...(timeout ? { timeout } : {}) });
   } catch (err) {
     // 410 = subscription expired/unsubscribed — caller should remove it
     if (err.statusCode === 410 || err.statusCode === 404) {
       throw Object.assign(err, { stale: true });
     }
     logger.error("Web push send error:", { error: err?.message });
+    if (throwOnError) throw err;
   }
 }
 

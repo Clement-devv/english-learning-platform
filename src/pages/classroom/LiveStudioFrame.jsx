@@ -13,6 +13,12 @@ const StudioDashboard = lazy(() => import('../teacher-mode/TeacherModeDashboard'
 
 export default function LiveStudioFrame({ enabled, bookingId, provider, children }) {
   const [dashboard, setDashboard] = useState(false);
+  useEffect(() => {
+    if (!enabled) return;
+    const open = () => setDashboard(true);
+    window.addEventListener('studio-open-dashboard', open);
+    return () => window.removeEventListener('studio-open-dashboard', open);
+  }, [enabled]);
   const navigate = useNavigate();
   const { ask, dialog } = useClassConfirmation();
   const finishClass = useRef(null);

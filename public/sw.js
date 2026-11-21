@@ -118,6 +118,12 @@ self.addEventListener("push", (event) => {
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      if (data.data?.kind === 'standalone-class-reminder') {
+        if (Date.parse(data.data.scheduledTime) <= Date.now()) return undefined;
+        list.forEach(client => client.postMessage({ type: 'studio-class-reminder', data: data.data }));
+        // Push remains user-visible even with an open app (required on Safari).
+        return self.registration.showNotification(title, options);
+      }
       const watching = list.some((c) => c.focused && c.visibilityState === "visible");
       if (watching) return undefined;
       return self.registration.showNotification(title, options);
@@ -144,7 +150,7 @@ self.addEventListener("notificationclick", (event) => {
       .then((list) => {
         const same = list.find((c) => new URL(c.url).pathname === target.pathname) || list[0];
         if (same && "focus" in same) {
-          same.postMessage({ type: "notification-click", url });
+          same.postMessage({ type: event.notification.data?.kind === 'standalone-class-reminder' ? 'studio-reminder-click' : 'notification-click', url });
           return same.focus();
         }
         if (clients.openWindow) return clients.openWindow(url);

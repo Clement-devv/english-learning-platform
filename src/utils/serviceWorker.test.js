@@ -84,3 +84,21 @@ describe('notification click', () => {
   })
 })
 
+
+it('shows a standalone class push with the app closed and tells open tabs to refresh the reminder', async () => {
+  const t = tab('https://school.example.com/teacher-mode/dashboard', { focused: true, visible: true });
+  const w = loadWorker({ windows: [t] });
+  const data = { kind: 'standalone-class-reminder', scheduledTime: new Date(Date.now() + 300000).toISOString(), url: '/teacher-mode/dashboard?tab=classes' };
+  await w.fire('push', pushEvent({ title: 'Class starts soon', data }));
+  expect(w.shown).toHaveLength(1);
+  expect(t.messages).toEqual([{ type: 'studio-class-reminder', data }]);
+  const closed = loadWorker();
+  await closed.fire('push', pushEvent({ title: 'Class starts soon', data }));
+  expect(closed.shown).toHaveLength(1);
+});
+it('uses a safe reminder click event for an active classroom', async () => {
+  const t = tab('https://school.example.com/classroom');
+  const w = loadWorker({ windows: [t] });
+  await w.fire('notificationclick', { notification: { data: { kind: 'standalone-class-reminder', url: '/teacher-mode/dashboard?tab=classes' }, close() {} } });
+  expect(t.messages).toEqual([{ type: 'studio-reminder-click', url: '/teacher-mode/dashboard?tab=classes' }]);
+});

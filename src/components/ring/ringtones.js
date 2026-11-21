@@ -155,19 +155,19 @@ export const RINGTONES = [
     emoji: "☎️",
     // Traditional landline ring: 480 Hz + 425 Hz simultaneously
     make:  () => loop((ctx, t, out) => {
-      [480, 425].forEach(freq => {
-        const osc  = ctx.createOscillator();
+      // Two longer traditional ring bursts with a clear pause between them.
+      [0, 1.65].forEach(offset => [480, 425].forEach(freq => {
+        const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(out);
+        osc.connect(gain); gain.connect(out);
         osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.15, t);
-        gain.gain.setValueAtTime(0.15, t + 0.9);
-        gain.gain.linearRampToValueAtTime(0, t + 1.05);
-        osc.start(t);
-        osc.stop(t + 1.1);
-      });
-    }, 2200),
+        gain.gain.setValueAtTime(0, t + offset);
+        gain.gain.linearRampToValueAtTime(0.18, t + offset + 0.04);
+        gain.gain.setValueAtTime(0.18, t + offset + 1.15);
+        gain.gain.linearRampToValueAtTime(0, t + offset + 1.22);
+        osc.start(t + offset); osc.stop(t + offset + 1.25);
+      }));
+    }, 4200),
   },
   {
     id:    "marimba",
@@ -180,9 +180,36 @@ export const RINGTONES = [
       note(ctx, 659, t + 0.52, 0.25, 0.24, out); // E5
     }, 2100),
   },
+  {
+    id:    "urgent-pair",
+    label: "Urgent Pair",
+    emoji: "🚨",
+    make:  () => loop((ctx, t, out) => {
+      [880, 660, 880, 660].forEach((freq, i) => note(ctx, freq, t + i * 0.16, 0.12, 0.3, out));
+    }, 1500),
+  },
+  {
+    id:    "bright-rise",
+    label: "Bright Rise",
+    emoji: "✨",
+    make:  () => loop((ctx, t, out) => {
+      [587, 740, 988].forEach((freq, i) => note(ctx, freq, t + i * 0.18, 0.2, 0.28, out));
+    }, 1700),
+  },
+  {
+    id:    "double-knock",
+    label: "Double Knock",
+    emoji: "🛎️",
+    make:  () => loop((ctx, t, out) => {
+      note(ctx, 1047, t, 0.12, 0.3, out);
+      note(ctx, 784, t + 0.24, 0.22, 0.28, out);
+      note(ctx, 1047, t + 0.58, 0.12, 0.3, out);
+      note(ctx, 784, t + 0.82, 0.22, 0.28, out);
+    }, 1900),
+  },
 ];
 
-export const DEFAULT_RINGTONE_ID  = "chime";
+export const DEFAULT_RINGTONE_ID  = "classic";
 export const CUSTOM_RINGTONE_ID   = "custom";
 
 /** Returns the ringtone entry for the given id, or the first one as fallback. */

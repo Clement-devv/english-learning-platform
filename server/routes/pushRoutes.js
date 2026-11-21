@@ -6,7 +6,7 @@
 import express from "express";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
-import { VAPID_PUB, sendPush, isPushServiceEndpoint } from "../utils/webPushService.js";
+import { VAPID_PUB, PUSH_CONFIGURED, sendPush, isPushServiceEndpoint } from "../utils/webPushService.js";
 import { getUserModelForRole, SESSION_ROLES } from "../utils/roleModels.js";
 import { badRequest, notFound, serverError } from '../utils/apiResponse.js';
 import logger from "../utils/logger.js";
@@ -42,7 +42,7 @@ async function loadCurrentSession(req) {
 
 // ── GET /api/push/vapid-key  —  public, used by frontend to subscribe ─────────
 router.get("/vapid-key", (_req, res) => {
-  if (!VAPID_PUB) return res.status(503).json({ error: "Push notifications not configured" });
+  if (!PUSH_CONFIGURED) return res.status(503).json({ error: "Push notifications not configured" });
   res.json({ key: VAPID_PUB });
 });
 

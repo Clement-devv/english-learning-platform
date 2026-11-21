@@ -130,6 +130,13 @@ if ('serviceWorker' in navigator) {
   // A notification was clicked while this tab was open (public/sw.js): go to its page
   // inside the app (React Router follows popstate) — e.g. /teacher/dashboard?tab=messages
   navigator.serviceWorker.addEventListener('message', (e) => {
+    if (e.data?.type === 'studio-reminder-click') {
+      if (window.location.pathname === '/classroom') { window.dispatchEvent(new Event('studio-open-dashboard')); return; }
+      if (window.location.pathname === '/teacher-mode/dashboard') { window.dispatchEvent(new Event('studio-open-classes')); return; }
+      window.history.pushState({}, '', '/teacher-mode/dashboard?tab=classes');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      return;
+    }
     if (e.data?.type !== 'notification-click' || typeof e.data.url !== 'string' || !e.data.url.startsWith('/')) return;
     window.history.pushState({}, '', e.data.url);
     window.dispatchEvent(new PopStateEvent('popstate'));
