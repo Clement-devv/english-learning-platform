@@ -315,3 +315,18 @@ it('sends paid class progress to the center at the end of the calendar week, onc
   await report('2026-11-15T17:00:00Z');
   expect(send.mock.calls[1][0].text).toContain('Linh: 5/15');
 });
+
+it('formats Nigeria daily email times in WAT even when the workspace previously defaulted to UTC', async () => {
+  const db = global.__TEST_DB__.useDb('standalone-nigeria-timezone', { useCache: true });
+  const owner = new mongoose.Types.ObjectId(), center = new mongoose.Types.ObjectId();
+  await db.collection('managedcenters').insertOne({ _id: center, name: 'E.G.O' });
+  await db.collection('bookings').insertOne({ teacherId: owner, managedCenterId: center,
+    scheduledTime: new Date('2026-11-19T12:00:00Z'), completedAt: new Date('2026-11-19T12:48:00Z'),
+    classTitle: 'Nigeria afternoon class', duration: 48, status: 'completed' });
+  const send = vi.fn().mockResolvedValue({ success: true });
+  await deliverStandaloneDailyReport(db, { timezone: 'UTC' }, { _id: owner, firstName: 'Teacher', email: 'teacher@example.test', timezone: 'Africa/Lagos' },
+    { _id: center, name: 'E.G.O' }, new Date('2026-11-19T23:01:00Z'), send);
+  expect(send).toHaveBeenCalledOnce();
+  expect(send.mock.calls[0][0].text).toContain('13:00 | Nigeria afternoon class');
+  expect(send.mock.calls[0][0].text).toContain('Africa/Lagos');
+});

@@ -265,6 +265,9 @@ router.post('/setup/:token', loginLimiter, handle(async (req, res) => {
   if (!validToken(req.params.token)) throw fail('Invalid or expired invitation.');
   const plain = passwordInput(req.body.password);
   const { continent, gender } = req.body;
+  const timezone = req.body.timezone || 'UTC';
+  try { if (typeof timezone !== 'string') throw new Error(); Intl.DateTimeFormat('en', { timeZone: timezone }); }
+  catch { throw fail('Choose a valid time zone.'); }
   if (!teacherSchema.path('continent').enumValues.includes(continent) || !teacherSchema.path('gender').enumValues.includes(gender)) throw fail('Choose your continent and gender.');
   if (req.body.acceptTerms !== true) throw fail('Please accept the terms.');
   const w = await TeacherWorkspace.findOneAndUpdate({ inviteHash: hash(req.params.token), inviteExpires: { $gt: new Date() }, status: 'invited' }, { $set: { status: 'activating' } }, { new: true });
@@ -272,8 +275,8 @@ router.post('/setup/:token', loginLimiter, handle(async (req, res) => {
   try {
     const password = await hashPassword(plain);
     const db = await getDb(w.key), Teacher = model(db, 'Teacher', teacherSchema);
-    const owner = await Teacher.findOneAndUpdate({ email: w.email }, { $set: { firstName: w.name, lastName: '', password, active: true, status: 'active', continent, gender, accountType: 'standalone', hasAcceptedTerms: true, termsAcceptedAt: new Date() } }, { upsert: true, new: true });
-    w.ownerId = owner._id; w.status = 'active'; w.inviteHash = undefined; w.inviteExpires = undefined;
+    const owner = await Teacher.findOneAndUpdate({ email: w.email }, { $set: { firstName: w.name, lastName: '', password, active: true, status: 'active', continent, gender, timezone, accountType: 'standalone', hasAcceptedTerms: true, termsAcceptedAt: new Date() } }, { upsert: true, new: true });
+    w.ownerId = owner._id; w.timezone = timezone; w.status = 'active'; w.inviteHash = undefined; w.inviteExpires = undefined;
     await w.save(); result(res, { email: w.email });
   } catch (error) { await TeacherWorkspace.updateOne({ _id: w._id, status: 'activating' }, { $set: { status: 'invited' } }); throw error; }
 }));

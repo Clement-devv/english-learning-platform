@@ -109,6 +109,7 @@ router.get("/teacher/:teacherId/history", verifyToken, async (req, res) => {
         id:                  { $first: "$_id" },
         topic:               { $first: "$topic" },
         duration:            { $first: "$duration" },
+        completedAt:         { $max: "$completedAt" },
         students:            { $push: "$stName" },
         adminRejected:       { $max: { $ifNull: ["$adminRejected", false] } },
         adminRejectedReason: { $max: { $ifNull: ["$adminRejectedReason", ""] } },
@@ -137,7 +138,7 @@ router.get("/teacher/:teacherId/history", verifyToken, async (req, res) => {
         { $lookup: { from: getStudent(req.db).collection.name, localField: "enrollments.studentId", foreignField: "_id", as: "st",
                      pipeline: [{ $project: { firstName: 1, lastName: 1 } }] } },
         { $project: {
-          _id: 0, id: "$_id", scheduledTime: 1, title: 1, duration: 1, missedReason: 1, platform: 1, managedCenterId: 1,
+          _id: 0, id: "$_id", scheduledTime: 1, completedAt: 1, title: 1, duration: 1, missedReason: 1, platform: 1, managedCenterId: 1,
           topic: { $ifNull: ["$description", ""] },
           students: { $map: { input: "$st", as: "x", in: { $trim: { input: { $concat: [{ $ifNull: ["$$x.firstName", ""] }, " ", { $ifNull: ["$$x.lastName", ""] }] } } } } },
           attended: { $size: { $filter: { input: { $ifNull: ["$enrollments", []] }, cond: { $eq: ["$$this.attendance", "attended"] } } } },

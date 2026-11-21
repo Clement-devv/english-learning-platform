@@ -31,7 +31,7 @@ export default function TeacherModeLogin({ mode = 'login' }) {
     setBusy(true);
     try {
       const path = mode === 'setup' ? `/setup/${token}` : mode === 'reset' ? `/reset/${token}` : mode === 'forgot' ? '/forgot-password' : '/login';
-      const { data } = await client.post(path, { email, password, ...(mode === 'setup' && { continent, gender }), acceptTerms: accepted, ...(twoFactor && code ? (useBackup ? { backupCode: code.trim() } : { twoFactorToken: code.trim() }) : {}) }, { headers: { Authorization: '' } });
+      const { data } = await client.post(path, { email, password, ...(mode === 'setup' && { continent, gender, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }), acceptTerms: accepted, ...(twoFactor && code ? (useBackup ? { backupCode: code.trim() } : { twoFactorToken: code.trim() }) : {}) }, { headers: { Authorization: '' } });
       if (data.requires2FA) { setTwoFactor(true); return; }
       if (mode !== 'login') { setMessage(mode === 'forgot' ? data.data.message : 'Saved. You can now sign in.'); setPassword(''); setConfirmPassword(''); setShowPassword(false); setShowConfirm(false); if (mode === 'setup') navigate('/teacher-mode/login', { replace: true }); return; }
       const teacher = { ...(data.teacher || data.user), accountType: 'standalone' };

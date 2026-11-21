@@ -64,3 +64,14 @@ it('retains the not-completed filter when switching centers and sends explicit c
   );
   expect(await screen.findByText('Academy B', { selector: 'strong' })).toBeInTheDocument();
 });
+
+it('shows a UTC completion timestamp as Nigeria local time', async () => {
+  const zone = vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockReturnValue({ timeZone: 'Africa/Lagos' });
+  api.get.mockResolvedValue({ data: { classes: [{ id: 'wat', title: 'Afternoon class', scheduledTime: '2026-11-19T12:00:00Z', completedAt: '2026-11-19T12:48:00Z', duration: 48, officiallyCompleted: true, students: [], managedCenterId: 'a' }], pagination: { totalPages: 1 }, counts: {} } });
+  try {
+    render(<History />);
+    const completion = await screen.findByText(/Completion recorded:/);
+    expect(completion).toHaveTextContent(/1:48:00 PM|13:48/);
+    expect(completion).toHaveTextContent('Africa/Lagos');
+  } finally { zone.mockRestore(); }
+});

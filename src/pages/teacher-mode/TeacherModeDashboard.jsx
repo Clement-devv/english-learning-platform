@@ -1,3 +1,4 @@
+import { useStudioTimezone } from './useStudioTimezone';
 import { useUploadQueue } from '../../context/UploadQueueContext';
 import { useStudioInstall } from './useStudioInstall';
 import StudioLanguageSwitch from './StudioLanguageSwitch';
@@ -137,6 +138,7 @@ export default function TeacherModeDashboard({ liveBookingId, onReturnToClass } 
   const run = async action => { setBusy(true); setError(''); setNotice(''); try { await action(); await refresh(); setNotice(previous => previous || 'Saved to your workspace.'); } catch (e) { setError(e.response?.data?.message || e.message || 'Please retry.'); } finally { setBusy(false); } };
   const copy = async url => { try { await navigator.clipboard.writeText(url); setNotice('Parent link copied. Share it privately with the family.'); } catch { setNotice(`Copy this private link: ${url}`); } };
   const teacherInfo = auth.user || JSON.parse(sessionStorage.getItem('teacherInfo') || '{}');
+  useStudioTimezone(teacherInfo, auth.setUser, setNotice);
   const props = { teacherInfo, students: filteredStudents.map(s => ({ ...s, isManaged: true })), isDarkMode: dark, studio: true };
   const unreadParents = messages.filter(m => m.sender === 'family' && !m.readAt).length;
   const switchTab = (id, options = {}) => {

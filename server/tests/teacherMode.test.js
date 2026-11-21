@@ -1,3 +1,4 @@
+import TeacherWorkspace from '../models/master/TeacherWorkspace.js';
 import { vi, describe, it, expect, beforeAll, afterAll } from 'vitest'
 import express from 'express'
 import request from 'supertest'
@@ -769,3 +770,12 @@ it('reserves a whole series against paid credits', async () => {
 
 
 
+
+it('syncs a standalone teacher and workspace to the Nigeria timezone', async () => {
+  const res = await call(teacher, 'patch', '/teachers/' + jwt.decode(teacher.token).id + '/timezone').send({ timezone: 'Africa/Lagos' });
+  expect(res.status).toBe(200);
+  const workspace = await TeacherWorkspace.findOne({ key: jwt.decode(teacher.token).centerId });
+  expect(workspace.timezone).toBe('Africa/Lagos');
+  const profile = await call(teacher, 'get', '/teachers/' + jwt.decode(teacher.token).id);
+  expect(profile.body.timezone).toBe('Africa/Lagos');
+});

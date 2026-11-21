@@ -15,6 +15,7 @@ export default function TeacherClassHistory({
   onChanged,
 }) {
   const { ask, dialog } = useClassConfirmation();
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [view, setView] = useState('completed'),
     [q, setQ] = useState(''),
     [page, setPage] = useState(1);
@@ -69,13 +70,13 @@ export default function TeacherClassHistory({
       const outcome = { all: 'All outcomes', completed: 'Completed', not_completed: 'Not completed' }[view];
       autoTable(pdf, {
         head: [['Class history', centerId ? centerName(centerId) : 'All centers']],
-        body: [[outcome, `${from || 'Earliest'} to ${to || 'latest'} | ${report.classes.length} classes`],
+        body: [['Time zone', timezone], [outcome, `${from || 'Earliest'} to ${to || 'latest'} | ${report.classes.length} classes`],
           ...(q.trim() ? [['Search', q.trim()]] : [])],
       });
       autoTable(pdf, {
         head: [['Date and time', 'Center', 'Class / topic', 'Type', 'Students', 'Minutes', 'Outcome / reason']],
         body: report.classes.map(c => [
-          new Date(c.scheduledTime).toLocaleString(), centerName(c.managedCenterId),
+          new Date(c.scheduledTime).toLocaleString(undefined, { timeZone: timezone }), centerName(c.managedCenterId),
           [c.title, c.topic].filter(Boolean).join('\n'), c.isGroupClass ? 'Group' : 'Individual',
           c.students?.filter(Boolean).join(', '), c.duration,
           c.officiallyCompleted && !c.adminRejected ? 'Completed' :
@@ -159,7 +160,7 @@ export default function TeacherClassHistory({
         <button onClick={() => window.print()}>Print record</button>
       </details>
       <div className="tm-list-toolbar">
-        <h3>Class history</h3>
+        <div><h3>Class history</h3><p className="tm-muted">Scheduled class times · {timezone}</p></div>
         <button type="button" onClick={download} disabled={exporting || Boolean(from && to && from > to)}>
           {exporting ? 'Preparing PDF…' : 'Download filtered PDF'}
         </button>
@@ -219,8 +220,9 @@ export default function TeacherClassHistory({
                   </strong>
                 </p>
                 <p className="tm-muted">
-                  {new Date(c.scheduledTime).toLocaleString()} · {c.duration} min
+                  Scheduled: {new Date(c.scheduledTime).toLocaleString(undefined, { timeZone: timezone })} · {c.duration} min
                 </p>
+                {c.completedAt && <p className="tm-muted">Completion recorded: {new Date(c.completedAt).toLocaleString(undefined, { timeZone: timezone })} · {timezone}</p>}
                 {(!c.officiallyCompleted || c.adminRejected) && (
                   <p className="tm-history-note">
                     <strong>What happened:</strong>{' '}

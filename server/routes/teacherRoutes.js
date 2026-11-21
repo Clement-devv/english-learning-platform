@@ -1,3 +1,4 @@
+import TeacherWorkspace from '../models/master/TeacherWorkspace.js';
 // server/routes/teacherRoutes.js
 import express from "express";
 import { toEmail } from "../utils/inputSanitizer.js";
@@ -268,6 +269,9 @@ router.patch("/:id/timezone", validateObjectId("id"), verifyToken, requireOwnerO
     try { Intl.DateTimeFormat(undefined, { timeZone: timezone }); }
     catch { return badRequest(res, "Invalid timezone identifier"); }
     await getTeacher(req.db).findByIdAndUpdate(req.params.id, { timezone });
+    if (req.teacherWorkspace && String(req.teacherWorkspace.ownerId) === String(req.params.id)) {
+      await TeacherWorkspace.updateOne({ _id: req.teacherWorkspace._id, ownerId: req.params.id }, { $set: { timezone } });
+    }
     res.json({ ok: true });
   } catch {
     serverError(res, "Error updating timezone");
