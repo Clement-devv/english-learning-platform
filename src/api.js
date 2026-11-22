@@ -73,17 +73,20 @@ function resolveCenterSlug() {
 // before the request leaves — this eliminates the 401 console noise that the
 // reactive-only approach produced.
 const isPublicGameRequest = url => /^\/games\/link\//.test(url || '');
+const isSuperAdminRequest = url => /^\/super-admin(?:\/|$)/.test(url || '');
 api.interceptors.request.use(
   async (config) => {
     const publicWorkspace = new URLSearchParams(window.location.search).get('workspace');
-    if (publicWorkspace && /^tw-[a-f\d]{24}$/.test(publicWorkspace)) {
+    if (isSuperAdminRequest(config.url)) {
+      // Platform sign-in and administration never belong to a teacher workspace.
+    } else if (publicWorkspace && /^tw-[a-f\d]{24}$/.test(publicWorkspace)) {
       config.params = { ...config.params, workspace: publicWorkspace };
     } else if (teacherModeKey() && !isPublicGameRequest(config.url)) {
       config.baseURL = `${BASE_URL}/teacher-mode/app`;
       const managedCenterId = sessionStorage.getItem('teacherModeCenter');
       if (managedCenterId) config.params = { ...config.params, managedCenterId };
     }
-    if (!config.headers.Authorization && !isPublicGameRequest(config.url)) {
+    if (!config.headers.Authorization && !isPublicGameRequest(config.url) && !isSuperAdminRequest(config.url)) {
       const session = getActiveSession();
       if (session) {
         let token = getToken(session.tokenKey);
@@ -212,7 +215,7 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const url = error.config?.url || "";
-    if (isPublicGameRequest(url)) return Promise.reject(error);
+    if (isPublicGameRequest(url) || isSuperAdminRequest(url)) return Promise.reject(error);
     const isAuthEndpoint = AUTH_PATHS.some((p) => url.includes(p));
     const status = error.response?.status;
 

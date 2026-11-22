@@ -121,6 +121,35 @@ const sendLink = async (to, subject, description, url, centerName) => {
 
 // Platform management: this is the only account-creation entry point.
 router.get('/admin/workspaces', verifySuperAdmin, handle(async (_req, res) => result(res, await list(TeacherWorkspace.find().select('-inviteHash -resetHash')))));
+router.get('/admin/workspaces/analytics', verifySuperAdmin, handle(async (_req, res) => {
+  const now = Date.now(), cutoff = new Date(now - 90_000);
+  const workspaces = await TeacherWorkspace.find({ status: 'active', ownerId: { $exists: true, $ne: null } }).select('name email key ownerId').lean();
+  const totals = { activeUsers: 0, activeRecordings: 0, upcomingClasses: 0, classesToday: 0, visitors: null };
+  const teachers = [];
+  for (let i = 0; i < workspaces.length; i += 5) {
+    const batch = await Promise.all(workspaces.slice(i, i + 5).map(async workspace => {
+      const db = await getDb(workspace.key);
+      const Teacher = model(db, 'Teacher', teacherSchema), Booking = model(db, 'Booking', bookingSchema);
+      const Group = model(db, 'GroupClass', groupClassSchema), ClassroomSession = model(db, 'ClassroomSession', classroomSessionSchema);
+      const [teacher, bookings, groupClasses, activeSessions] = await Promise.all([
+        Teacher.findById(workspace.ownerId).select('sessions').lean(),
+        Booking.find({ teacherId: workspace.ownerId, scheduledTime: { $gte: new Date(now - 86400000), $lt: new Date(now + 86400000) }, status: { $in: ['accepted', 'completed', 'missed'] } }).select('scheduledTime status').lean(),
+        Group.find({ teacherId: workspace.ownerId, scheduledTime: { $gte: new Date(now - 86400000), $lt: new Date(now + 86400000) }, status: { $in: ['open', 'full', 'in-progress', 'completed', 'missed'] } }).select('scheduledTime status').lean(),
+        ClassroomSession.find({ status: 'active', 'heartbeats.timestamp': { $gte: cutoff }, 'heartbeats.userRole': 'teacher' }).select('bookingId heartbeats').lean(),
+      ]);
+      const activeSessionsCount = (teacher?.sessions || []).filter(s => s.isActive && new Date(s.lastActivity || 0) >= cutoff).length;
+      const classes = [...bookings, ...groupClasses];
+      const today = classes.filter(c => new Date(c.scheduledTime).toDateString() === new Date(now).toDateString());
+      const upcoming = classes.filter(c => c.status !== 'completed' && c.status !== 'missed' && new Date(c.scheduledTime) > new Date(now));
+      const live = activeSessions.filter(s => s.heartbeats?.some(h => h.userRole === 'teacher' && h.timestamp && now - new Date(h.timestamp).getTime() <= 90000));
+      return { id: String(workspace._id), name: workspace.name, activeUsers: activeSessionsCount,
+        activeRecordings: live.length, upcomingClasses: upcoming.length, classesToday: today.length };
+    }));
+    for (const row of batch) { teachers.push(row); for (const key of ['activeUsers', 'activeRecordings', 'upcomingClasses', 'classesToday']) totals[key] += row[key]; }
+  }
+  res.set('Cache-Control', 'private, no-store');
+  result(res, { totals, teachers, visitorTracking: 'unavailable' });
+}));
 router.get('/admin/earnings', verifySuperAdmin, handle(async (_req, res) => {
   const workspaces = await TeacherWorkspace.find({ ownerId: { $exists: true, $ne: null } }).select('name email key status ownerId timezone').sort({ name: 1, _id: 1 }).lean();
   const teachers = [];

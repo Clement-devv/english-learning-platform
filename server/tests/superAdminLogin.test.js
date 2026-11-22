@@ -35,6 +35,20 @@ beforeAll(async () => {
 afterAll(async () => { await mongoose.disconnect() })
 
 describe('super-admin sign-in', () => {
+  it('retries sending immediately after a delivery failure instead of claiming a code was sent', async () => {
+    const { sendEmail } = await import('../utils/emailService.js')
+    await SuperAdmin.updateOne({ email: EMAIL }, { $unset: { loginCode: 1 } })
+    vi.mocked(sendEmail).mockResolvedValueOnce({ success: false, error: 'Mail server unavailable' })
+    const failed = await post('/login', { email: EMAIL, password: PASSWORD })
+    expect(failed.status).toBe(500)
+    const account = await SuperAdmin.findOne({ email: EMAIL }).select('+loginCode').lean()
+    expect(account.loginCode).toBeUndefined()
+    const count = sent.length
+    const retry = await post('/login', { email: EMAIL, password: PASSWORD })
+    expect(retry.status).toBe(202)
+    expect(sent).toHaveLength(count + 1)
+    expect((await post('/login/verify', { pendingToken: retry.body.pendingToken, code: lastCode() })).status).toBe(200)
+  })
   it('a correct password alone does not give a session token', async () => {
     const res = await post('/login', { email: EMAIL, password: PASSWORD })
     expect(res.status).toBe(202)

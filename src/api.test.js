@@ -28,6 +28,16 @@ describe('center and standalone API isolation', () => {
     expect(config.baseURL).toMatch(/\/teacher-mode\/app$/);
     expect(config.headers.Authorization).toBe(`Bearer ${jwt}`);
   });
+  it('keeps Super Admin sign-in on the platform API when a standalone teacher is signed in', async () => {
+    const jwt = token({ role: 'teacher', centerId: 'tw-111111111111111111111111', realm: 'teacher-mode' });
+    sessionStorage.setItem('teacherToken', jwt);
+    const config = await hooks.request({ url: '/super-admin/login', headers: {}, baseURL: '/api/v1' });
+    expect(config.baseURL).toBe('/api/v1');
+    expect(config.headers.Authorization).toBeUndefined();
+    const error = { config: { url: '/super-admin/login/verify' }, response: { status: 401 } };
+    await expect(hooks.response(error)).rejects.toBe(error);
+    expect(sessionStorage.getItem('teacherToken')).toBe(jwt);
+  });
   it.each([
     [{ role: 'teacher', centerId: 'existing-school' }, '/teacher/login'],
     [{ role: 'teacher', centerId: 'tw-111111111111111111111111', realm: 'teacher-mode' }, '/teacher-mode/login'],

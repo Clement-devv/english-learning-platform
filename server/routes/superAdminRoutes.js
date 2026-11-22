@@ -187,13 +187,15 @@ router.post('/login', loginLimiter, validateSuperAdminLogin, async (req, res) =>
       && new Date(current.expiresAt) > new Date();
     if (!recentlySent) {
       const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+      const codeHash = await bcrypt.hash(code, 10);
       await SuperAdmin.updateOne({ _id: superAdmin._id }, { $set: { loginCode: {
-        codeHash: await bcrypt.hash(code, 10),
+        codeHash,
         expiresAt: new Date(Date.now() + SA_CODE_TTL_MS),
         sentAt: new Date(),
         attempts: 0,
       } } });
-      const mail = await sendEmail({
+      let mail;
+      try { mail = await sendEmail({
         to: superAdmin.email,
         subject: `${config.appName} — your super admin sign-in code`,
         html: `
@@ -203,9 +205,12 @@ router.post('/login', loginLimiter, validateSuperAdminLogin, async (req, res) =>
           <p>It expires in <strong>10 minutes</strong>.</p>
           <p>If you did not just try to sign in, someone knows your password — change it now.</p>
         `,
-      });
-      if (mail && mail.success === false) {
-        logger.error('Super admin sign-in code email failed', { error: mail.error });
+      }); } catch (error) { mail = { success: false, error: error?.message }; }
+      if (!mail?.success || mail.skipped) {
+        // Only clear the code from this attempt; a concurrent retry may have
+        // already issued a newer one. A failed delivery must not start cooldown.
+        await SuperAdmin.updateOne({ _id: superAdmin._id, 'loginCode.codeHash': codeHash }, { $unset: { loginCode: 1 } });
+        logger.error('Super admin sign-in code email failed', { error: mail?.error || 'Email was not sent' });
         return serverError(res, 'Could not send the sign-in code. Please try again shortly.');
       }
     }
